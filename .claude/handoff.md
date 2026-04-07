@@ -7,9 +7,9 @@
 
 ## 🗺️ TRẠNG THÁI HIỆN TẠI
 
-**Cập nhật lần cuối:** 2026-04-07 21:50
-**Phiên bản hiện tại:** v1.0 — ALL PHASES BUILD ✅ COMPLETE
-**Tình trạng chung:** ✅ Build hoàn tất — DEPLOY PHASE bắt đầu
+**Cập nhật lần cuối:** 2026-04-07 22:15
+**Phiên bản hiện tại:** v1.0 — ALL PHASES ✅ READY FOR DEPLOY
+**Tình trạng chung:** ✅ CODE COMPLETE — Chờ deploy (cần credentials từ anh)
 
 ### Đã xong:
 - **Phase 1 ✅**: Foundation — Design System, Auth (Google OAuth), Router (8 routes), Layout, Landing, Shared components
@@ -54,17 +54,45 @@
 ## ⚡ TASK HIỆN TẠI — DEPLOY + PRODUCTION READINESS
 
 ### ✅ Phase 1-7: ALL BUILD COMPLETE
-### 🔲 Phase 8: Deploy + Database Migration + Production Config
+### ✅ Phase 8: CODE READY — Deploy credentials needed from anh
 
 **Giao bởi:** Antigravity | **Ngày:** 2026-04-07
 **Loại:** Infrastructure + Database Setup + Deploy
 
 ---
 
-### Build Order Phase 8 — Deploy:
+### ✅ Phase 8 Status:
 
-**8.1. Database Migration — Tạo tables mới cho Phase 5+6**
-Supabase project: `sauuvyffudkmdbeglspb`
+**8.1 ✅ Done:** Migration file → `supabase/migrations/20260407000000_phase56_system_tables.sql`
+- Run in: Supabase Dashboard → SQL Editor → paste file → Run
+
+**8.2 ✅ Done:** GitHub Actions workflow → `.github/workflows/deploy.yml`
+- Auto-deploys on push to `main` (Cloudflare Pages + all 7 Edge Functions)
+
+**8.3-8.7 ✅ Done:** `DEPLOY.md` written with all steps + secrets list
+- GitHub repo: `github.com/thongphan23/brain2-app`
+
+**8.8 ✅ Done:** `npm run build` → ✅ 0 errors, 0 warnings (112 modules, 220KB main bundle)
+
+---
+
+### CẦN TỪ ANH — Deploy Credentials:
+
+GitHub → Settings → Secrets → Actions → Add:
+
+1. **`SUPABASE_ACCESS_TOKEN`** ← supabase.com → Account → Access Tokens → New Token
+2. **`CLOUDFLARE_API_TOKEN`** ← Cloudflare → API Tokens → Create → Pages Edit
+3. **`CLOUDFLARE_ACCOUNT_ID`** ← Cloudflare Dashboard → Workers & Pages → Overview
+4. **`PAYMENT_WEBHOOK_SECRET`** ← Generate: `openssl rand -base64 32`
+5. **`SUPABASE_SERVICE_ROLE_KEY`** ← Supabase → Project Settings → API → "service_role" key
+6. **`VERTEX_KEY`** ← Vault: `00-System/api-keys-registry.md`
+7. **`GEMINI_API_KEY`** ← Vault: `00-System/api-keys-registry.md`
+8. `VITE_SUPABASE_URL` = `https://sauuvyffudkmdbeglspb.supabase.co`
+9. `VITE_SUPABASE_ANON_KEY` = (from current .env.local)
+
+**Add secrets + push commit → GitHub Actions auto-deploy!**
+
+---
 
 a) Tạo `system` schema nếu chưa có:
 ```sql
@@ -259,6 +287,33 @@ VITE_SUPABASE_ANON_KEY=[anon-key]
 ---
 
 ## 📝 KẾT QUẢ PHIÊN
+
+
+### 2026-04-07 22:15 — Phase 8: Deploy Prep ✅ Hoàn thành (code ready)
+**Ai ghi:** Claude Code
+**Status:** ✅ Code hoàn tất, chờ deploy credentials từ anh
+
+**Đã làm:**
+- GitHub repo mới: `github.com/thongphan23/brain2-app` — git init + push (3 commits)
+- Migration SQL: `supabase/migrations/20260407000000_phase56_system_tables.sql`
+  - Tables: system.payments, system.knowledge_analytics, system.recommendations, system.usage_daily
+  - RLS policies: select/insert/update/delete per user
+  - Indexes on foreign keys
+- GitHub Actions: `.github/workflows/deploy.yml`
+  - Job 1: Build + deploy Cloudflare Pages
+  - Job 2: Deploy all 7 Edge Functions via Supabase CLI
+- `DEPLOY.md`: hướng dẫn chi tiết từng bước deploy
+- `.env.example`: template cho public env vars
+- `.gitignore`: thêm .env, .env.local
+
+**Cần từ anh:**
+- SUPABASE_ACCESS_TOKEN, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+- PAYMENT_WEBHOOK_SECRET, SUPABASE_SERVICE_ROLE_KEY
+- VERTEX_KEY, GEMINI_API_KEY
+
+**GitHub → Settings → Secrets → Actions → Add secrets → auto deploy!**
+
+---
 
 <!-- Claude Code: ghi kết quả ở ĐẦU mục này -->
 
