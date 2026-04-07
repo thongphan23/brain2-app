@@ -58,15 +58,20 @@ export function useAuth(): UseAuthReturn {
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      const currentUser = session?.user ?? null
-      setUser(currentUser)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const currentUser = session?.user ?? null
+        setUser(currentUser)
 
-      if (currentUser) {
-        await createProfileIfNeeded(currentUser)
-        await fetchProfile(currentUser.id)
+        if (currentUser) {
+          await createProfileIfNeeded(currentUser)
+          await fetchProfile(currentUser.id)
+        }
+      } catch (err) {
+        console.error('[useAuth] Init error:', err)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     init()
 

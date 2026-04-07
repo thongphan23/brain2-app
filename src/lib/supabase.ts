@@ -9,6 +9,12 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         flowType: 'pkce',
         autoRefreshToken: true,
         persistSession: true,
+        storageKey: 'sb-brain2-auth-token',
+        // Bypass navigator.locks to prevent deadlock on custom domains
+        // Safe for SPA: only one tab context uses session at a time
+        lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => {
+            return await fn()
+        },
     },
 })
 
