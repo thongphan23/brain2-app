@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import { ToastProvider } from './components/shared/Toast'
 import { ErrorBoundary } from './components/shared/ErrorBoundary'
-import { useAuth } from './hooks/useAuth'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { Skeleton } from './components/shared/Skeleton'
 
 // Eager loads (critical)
@@ -17,7 +17,37 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ de
 const ImportPage = lazy(() => import('./pages/ImportPage').then(m => ({ default: m.ImportPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
 
-// ─── Protected Route Wrapper ───────────────────────────────
+// ─── Page Fallback ────────────────────────────────────────────
+function PageFallback() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+      <Skeleton height="40px" width="200px" />
+    </div>
+  )
+}
+
+// ─── Landing Route ─────────────────────────────────────────────
+function LandingRoute() {
+  const { user, loading, profile, signInWithGoogle } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="auth-callback">
+        <div className="auth-callback-card">
+          <div className="auth-callback-spinner">⏳</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (user && profile?.onboarding_completed) return <Navigate to="/chat" replace />
+  if (user && !profile?.onboarding_completed) return <Navigate to="/onboarding" replace />
+
+  return <LandingPage onGetStarted={signInWithGoogle} />
+}
+
+// ─── Protected Route Wrapper ──────────────────────────────────
+// NOTE: Calls useAuth() from context — no new listener created.
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, profile } = useAuth()
 
@@ -39,44 +69,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-function PageFallback() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-      <Skeleton height="40px" width="200px" />
-    </div>
-  )
-}
-
-// ─── Landing Route ─────────────────────────────────────────
-import { supabase } from './lib/supabase'
-
-function handleGoogleLogin() {
-  supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo: `${window.location.origin}/auth/callback` },
-  })
-}
-
-function LandingRoute() {
-  const { user, loading, profile } = useAuth()
-
-  if (loading) {
-    return (
-      <div className="auth-callback">
-        <div className="auth-callback-card">
-          <div className="auth-callback-spinner">⏳</div>
-        </div>
-      </div>
-    )
-  }
-
-  if (user && profile?.onboarding_completed) return <Navigate to="/chat" replace />
-  if (user && !profile?.onboarding_completed) return <Navigate to="/onboarding" replace />
-
-  return <LandingPage onGetStarted={handleGoogleLogin} />
-}
-
-// ─── App ──────────────────────────────────────────────────
+// ─── Routes ───────────────────────────────────────────────────
 function AppRoutes() {
   return (
     <Routes>
@@ -100,12 +93,15 @@ function AppRoutes() {
   )
 }
 
+// ─── App Root ──────────────────────────────────────────────────
 export default function App() {
   return (
     <BrowserRouter>
       <ToastProvider>
         <ErrorBoundary>
-          <AppRoutes />
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
         </ErrorBoundary>
       </ToastProvider>
     </BrowserRouter>
