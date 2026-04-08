@@ -46,8 +46,29 @@ function LandingRoute() {
   return <LandingPage onGetStarted={signInWithGoogle} />
 }
 
-// ─── Protected Route Wrapper ──────────────────────────────────
-// NOTE: Calls useAuth() from context — no new listener created.
+// ─── Auth Route — only checks login (for /onboarding) ─────────
+function AuthRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="auth-callback">
+        <div className="auth-callback-card">
+          <div className="auth-callback-spinner">⏳</div>
+          <div className="auth-callback-title">🧠 Brain2</div>
+          <div className="auth-callback-subtitle">Đang tải...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) return <Navigate to="/" replace />
+
+  return <>{children}</>
+}
+
+// ─── Protected Route — checks login + onboarding completed ────
+// NOTE: Do NOT wrap /onboarding with this — it causes infinite redirect!
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, profile } = useAuth()
 
@@ -78,7 +99,7 @@ function AppRoutes() {
       <Route path="/auth/callback" element={<AuthCallback />} />
 
       {/* Auth + onboarding */}
-      <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+      <Route path="/onboarding" element={<AuthRoute><OnboardingPage /></AuthRoute>} />
       <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
 
       {/* Lazy-loaded */}
