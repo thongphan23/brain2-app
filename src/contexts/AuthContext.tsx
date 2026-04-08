@@ -30,8 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchingRef = useRef(false)
 
   const fetchProfile = useCallback(async (userId: string) => {
-    if (fetchingRef.current) return
-    fetchingRef.current = true
+    // Always reset guard to allow refresh after failed/stale fetch attempts
+    fetchingRef.current = false
     try {
       const { data } = await supabase
         .from('profiles')
@@ -41,8 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data) setProfile(data as Profile)
     } catch (err) {
       console.error('[AuthContext] fetchProfile error:', err)
-    } finally {
-      fetchingRef.current = false
     }
   }, [])
 

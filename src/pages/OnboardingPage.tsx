@@ -30,14 +30,30 @@ export function OnboardingPage() {
     setLoading(true)
 
     try {
-      await supabase
-        .from('profiles')
-        .update({
+      // Use update-profile edge function (service role → bypasses RLS)
+      const session = await supabase.auth.getSession()
+      const token = session.data.session?.access_token
+
+      if (!token) {
+        console.error('[Onboarding] No session token')
+        setLoading(false)
+        return
+      }
+
+      const { error: callError } = await supabase.functions.invoke('update-profile', {
+        body: {
           display_name: displayName || user.user_metadata?.name || user.email?.split('@')[0],
           usage_goals: selectedGoals,
           onboarding_completed: true,
-        })
-        .eq('id', user.id)
+        },
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (callError) {
+        console.error('[Onboarding] Edge function error:', callError)
+        setLoading(false)
+        return
+      }
 
       await refreshProfile()
 

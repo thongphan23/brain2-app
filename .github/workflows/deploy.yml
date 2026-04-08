@@ -63,6 +63,7 @@ jobs:
           supabase functions deploy import-files
           supabase functions deploy payment-webhook
           supabase functions deploy recommend
+          supabase functions deploy update-profile
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           VERTEX_KEY: ${{ secrets.VERTEX_KEY }}
