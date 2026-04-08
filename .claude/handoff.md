@@ -258,6 +258,29 @@
 
 ## 📝 KẾT QUẢ PHIÊN
 
+### 2026-04-08 10:35 — BUG 7 FIX: Infinite redirect loop + Production verified ✅
+**Ai ghi:** Antigravity (trực tiếp fix, không qua Claude Code)
+**Status:** 🟡 Landing page ĐÃ HOẠT ĐỘNG — Onboarding cần test thủ công
+
+**Root cause mới (BUG 7):** `/onboarding` route bọc trong `ProtectedRoute` → `ProtectedRoute` redirect về `/onboarding` khi `onboarding_completed === false` → VÒNG LẶP VÔ TẬN.
+
+**Fix:** Tạo `AuthRoute` (chỉ check login, KHÔNG check onboarding) cho `/onboarding`. `ProtectedRoute` (check login + onboarding) cho `/chat`, `/vault`, etc.
+
+**Commit:** `29b8fbb` — "fix: break infinite redirect loop"
+
+**Production verification:**
+- ✅ Firecrawl scrape `brain2.thongphan.com` → HTML đầy đủ: Hero + Features (6 cards) + Pricing (Free/Pro/VIP) + CTA
+- ✅ Landing page render cho ANONYMOUS users (không có session)
+- ⚠️ Users CÓ SESSION CŨ (đã login trước fix) bị redirect sang `/onboarding` → trang onboarding có thể BLANK do AuthContext fetchProfile loop
+- 🔲 Cần test: clear browser storage → login lại xem onboarding hiện đúng không
+
+**Remaining issues:**
+1. AuthContext `fetchProfile` có thể bị gọi lặp do `onAuthStateChange` fire liên tục khi session unstable
+2. Migration schema mismatch chưa chạy trên Supabase
+3. E2E login flow chưa test được
+
+---
+
 ### 2026-04-08 10:15 — AUDIT FIX: All 6 bugs resolved, production smoke test PASS ✅
 **Ai ghi:** Claude Code
 **Status:** ✅ Hoàn thành toàn bộ task, smoke test production PASS
