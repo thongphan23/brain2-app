@@ -1,4 +1,4 @@
-# 📋 Sổ Bàn Giao v2.0 — Brain2 Platform
+# 📋 Sổ Bàn Giao v3.0 — Brain2 Platform: FULL STABILIZATION
 
 > File này là kênh giao tiếp 2 chiều giữa Antigravity (PM) và Claude Code (Builder).
 > ⚠️ File này là NGUỒN SỰ THẬT DUY NHẤT sau khi /clear — đọc KỸ trước khi làm.
@@ -7,57 +7,30 @@
 
 ## 🗺️ TRẠNG THÁI HIỆN TẠI
 
-**Cập nhật lần cuối:** 2026-04-08 14:00
-**Phiên bản:** v2.1 — Fixed BUG 11, deployed ✅
-**Tình trạng chung:** 🟢 Deployed — fix BUG 11 pending RLS migration on Supabase Dashboard
+**Cập nhật lần cuối:** 2026-04-08 15:40
+**Phiên bản:** v3.0 — FULL PRODUCTION STABILIZATION
+**Tình trạng chung:** 🔴 CRITICAL — App online nhưng chat KHÔNG hoạt động + nhiều tính năng chưa kiểm tra
 
-### Đã fix (qua 3 phiên audit, 13 bugs):
+### Tiến độ qua 3 phiên audit (bugs 1-11):
+- ✅ BUG 1-10: Auth architecture, PKCE, infinite loops → FIXED
+- ✅ BUG 11: Onboarding freeze → FIXED (RLS UPDATE + fetchingRef reset)
+- ✅ Landing page renders đẹp
+- ✅ Onboarding 3 steps chạy mượt
+- ✅ RLS policies đầy đủ cho profiles (SELECT, INSERT, UPDATE)
 
-### ĐANG LỖI — BUG 11 — ĐÃ FIX NHƯNG CẦN RUN MIGRATION
+### 🔴 BUG HIỆN TẠI — BUG 12: Chat CHẾT HOÀN TOÀN
+**Triệu chứng (user báo):** "Khi chat, hệ thống mất luôn đoạn chat, không phản hồi không gì cả"
+**Bằng chứng từ edge function logs:**
+```
+POST | 503 | /functions/v1/chat — execution_time_ms: 2359
+```
+→ Edge function `chat` trả **503 Service Unavailable** → vertex-key.com API fail
 
-**Đã thực hiện:**
-1. ✅ Phase A: Kiểm tra RLS — không thể query từ CLI (chưa link)
-2. ✅ Tạo migration file: `supabase/migrations/20260408000000_add_profiles_update_policy.sql`
-3. ✅ Fix `fetchingRef` deadlock trong `AuthContext.fetchProfile` — reset `fetchingRef.current = false` ở ĐẦU hàm
-4. ✅ Fix `OnboardingPage.handleComplete` — check `updateError` sau supabase update
-5. ✅ Build + Deploy: bundle hash mới `index-DhCkPRgG.js` trên production
-
-**⚠️ CẦN CHẠY MIGRATION TRÊN SUPABASE DASHBOARD:**
-Anh cần vào Supabase Dashboard → SQL Editor → paste nội dung file:
-`supabase/migrations/20260408000000_add_profiles_update_policy.sql`
-→ Run
-
-**Root cause cuối cùng:**
-- `fetchingRef.current = true` bị lock từ lần init trước → `refreshProfile()` skip fetch
-- Hoặc `profiles` table không có UPDATE policy → supabase.update() fail im lặng → profile không update → ProtectedRoute block /chat
-
----
-
-### Hướng tiếp cận:
-- ~~Phase 1: Database + Core Engine~~ ✅
-- ~~Phase 2: Brain2 fix + Worker daemon + CLI~~ ✅
-- ~~Phase 3: Security + Multi-channel + Polish + E2E~~ ✅
-- ~~Phase 4: Embedding Resilience + API + Production Ready~~ ✅
-- ~~Phase 5: Dashboard Integration~~ ✅
-- ~~Phase 6: Production Hardening + Polish + E2E~~ ✅ — HOÀN TẤT
-1. ✅ BUG 1: Code chưa push → đã push tất cả commits
-2. ✅ BUG 2: Multiple auth listeners → AuthContext single listener
-3. ✅ BUG 3: Schema duplication → migration file tạo (CHƯA CHẠY)
-4. ✅ BUG 4: Orphan LandingPage files → xóa 29KB
-5. ✅ BUG 5: PKCE fragile → 15s timeout + error recovery
-6. ✅ BUG 6: Onboarding blank → hệ quả Bug 2+7+8, đã fix
-7. ✅ BUG 7: Infinite redirect loop → `/onboarding` dùng AuthRoute thay ProtectedRoute
-8. ✅ BUG 8: Infinite profile fetch → track currentUserIdRef, skip TOKEN_REFRESHED
-9. ✅ BUG 9: Loading spinner vĩnh viễn → 5s safety timeout
-10. ✅ BUG 10: Cloudflare Pages = Direct Upload, không auto-deploy → dùng wrangler
-
-### ĐANG LỖI — BUG 11 (MỚI):
-**Triệu chứng:** Onboarding hiện form OK (3 steps: tên, goals, first prompt). Khi nhấn nút **"Bắt đầu Brain2 🚀"** ở Step 3 → **giao diện ĐỨNG** (freeze, không navigate tới /chat).
-
-**Root cause khả năng nhất:**
-1. `handleComplete()` → `refreshProfile()` → gọi `fetchProfile()` → `fetchingRef.current` vẫn `true` (bị khóa từ lần init trước) → SKIP → profile không refresh → `ProtectedRoute` thấy `onboarding_completed: false` → redirect lại /onboarding → LOOP
-2. Hoặc `supabase.from('profiles').update(...)` fail do RLS policy chưa cho phép user UPDATE chính mình
-3. Hoặc `refreshProfile()` update profile state → `onAuthStateChange` không fire → profile context vẫn cũ → navigation tới /chat bị ProtectedRoute block → redirect vòng
+**Root causes khả năng:**
+1. `VERTEX_KEY_API_KEY` secret hết balance / sai key
+2. Model ID `gemini-2.5-flash-chat` không đúng format vertex-key.com yêu cầu
+3. Frontend nhận 503 nhưng `contentType` check ĐÚNG (non-streaming error path thử parse JSON) → user message bị XÓA khỏi UI (`setMessages(prev => prev.filter(...))`), nên "mất luôn đoạn chat"
+4. Edge function dùng `Supabase.ai.Session('gte-small')` cho embedding — có thể fail và gây lỗi logic flow
 
 ---
 
@@ -67,16 +40,16 @@ Anh cần vào Supabase Dashboard → SQL Editor → paste nội dung file:
 - `~/.claude/skills/` — 16 global skills (Superpowers, Frontend Design, Testing...)
 
 ### Spec files (ĐỌC TRƯỚC):
-- `.claude/spec/design-system.md` — Colors, typography, spacing, component styles
+- `.claude/spec/design-system.md` — Colors, typography, spacing
 - `.claude/prd/PRD_brain2-platform-rebuild.md` — Full PRD 16 sections
 
 ### Conventions bắt buộc:
-- **Vanilla CSS ONLY** — CSS variables, design tokens system ở `index.css`
+- **Vanilla CSS ONLY** — CSS variables, design tokens ở `index.css`
 - **Dark mode mặc định** — Navy Blue `#2563B8` + Gold `#D4A537`, bg-primary `#111318`
 - **Inter font** — body + headings. JetBrains Mono — code blocks
 - **Streaming chat** — SSE, không polling
-- **Error messages tiếng Việt** — toast notifications
-- **RLS enforced** — mọi table Supabase phải có Row Level Security
+- **Error messages tiếng Việt**
+- **RLS enforced** — mọi table phải có Row Level Security
 - **Naming**: Components PascalCase, hooks `use`+CamelCase, CSS `.kebab-case`, DB `snake_case`
 
 ---
@@ -88,193 +61,448 @@ Anh cần vào Supabase Dashboard → SQL Editor → paste nội dung file:
 
 ---
 
-## ⚡ TASK HIỆN TẠI — AUDIT TOÀN DIỆN + FIX BUG 11
+## ⚡ TASK HIỆN TẠI — FULL PRODUCTION STABILIZATION (24h Sprint)
 
-### 🔲 FULL AUDIT + FIX — Brain2 Production
-**Giao bởi:** Antigravity | **Ngày:** 2026-04-08 13:40
-**Loại:** Critical Bug Fix + Full Code Audit
-**Ưu tiên:** 🔴 CRITICAL — App đứng khi submit onboarding, không dùng được
+### 🔲 MEGA TASK: Brain2 Production-Ready
+**Giao bởi:** Antigravity | **Ngày:** 2026-04-08 15:40
+**Loại:** Critical Bug Fix + Full Feature Audit + Production Hardening
+**Ưu tiên:** 🔴 HIGHEST — App phải dùng được end-to-end
+**Thời lượng:** Long-running (chạy liên tục cho đến khi PASS HẾT AC)
 
 ---
 
-### 🔴 BUG 11: Onboarding Freeze khi nhấn "Bắt đầu Brain2 🚀"
+## PHASE 1: FIX CHAT (🔴 CRITICAL — làm ĐẦU TIÊN)
 
-**Triệu chứng:**
-- Onboarding form hiện OK (3 steps: tên, goals, first prompt)
-- Khi nhấn nút cuối cùng "Bắt đầu Brain2 🚀" → giao diện ĐỨNG
-- Không navigate tới /chat, không có error visible trên UI
-- Button có thể stuck ở trạng thái "Đang lưu..."
+### BUG 12: Chat trả 503, user message biến mất
 
-**Code liên quan:**
+**Root cause analysis — kiểm tra theo thứ tự:**
+
+#### 1.1. Verify VERTEX_KEY_API_KEY
+```bash
+# Test direct API call
+curl -s -X POST "https://vertex-key.com/api/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $(supabase functions env list --project-ref sauuvyffudkmdbeglspb 2>/dev/null | grep VERTEX_KEY_API_KEY | awk '{print $2}')" \
+  -d '{"model": "gemini-2.5-flash-chat", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 50}' | head -200
+```
+→ Nếu trả error balance/auth → KEY HẾT TIỀN hoặc SAI
+→ Nếu trả 404 model → MODEL ID SAI
+
+**ALTERNATIVE:** Nếu không lấy được key trực tiếp, test qua edge function:
+```bash
+curl -s -X GET "https://sauuvyffudkmdbeglspb.supabase.co/functions/v1/chat"
+```
+→ Trả JSON với `models` array + `version` + `status`
+
+#### 1.2. Kiểm tra model IDs
+File `supabase/functions/chat/index.ts` dòng 58-69 define MODELS:
+- `gemini-2.5-flash` → vertexId `gemini-2.5-flash-chat`
+- `gemini-2.5-pro` → vertexId `gemini-2.5-pro-chat`
+
+**⚠️ QUAN TRỌNG:** vertex-key.com có thể KHÔNG dùng suffix `-chat`. Kiểm tra documentation hoặc test trực tiếp. Có thể cần thay đổi thành:
+- `gemini-2.5-flash` (không có `-chat`)
+- `google/gemini-2.5-flash-preview-04-17` (format đầy đủ)
+
+#### 1.3. Fix frontend error handling
+File `src/hooks/useChat.ts` dòng 82-94:
+- Khi server trả non-streaming response → code parse JSON → remove user message
+- **Vấn đề:** User thấy tin nhắn biến mất mà KHÔNG thấy error message
+- **Fix:** Giữ user message + hiện error toast rõ ràng
 
 ```tsx
-// src/pages/OnboardingPage.tsx dòng 28-55
-const handleComplete = async () => {
-    if (!user) return
-    setLoading(true)
-    try {
-      // 1. Update profile — CÓ THỂ FAIL do RLS?
-      await supabase.from('profiles').update({
-          display_name: displayName || ...,
-          usage_goals: selectedGoals,
-          onboarding_completed: true,
-        }).eq('id', user.id)
+// TRƯỚC (xấu):
+setMessages(prev => prev.filter(m => m.id !== userMessage.id))
 
-      // 2. Refresh profile — CÓ THỂ HANG do fetchingRef lock?
-      await refreshProfile()
-
-      // 3. Navigate — CÓ THỂ BỊ BLOCK bởi ProtectedRoute?
-      navigate('/chat', { replace: true })
-    } catch (err) {
-      console.error('Onboarding error:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
+// SAU (tốt):
+// KHÔNG xóa userMessage. Thêm error bubble DƯỚI user message
+setMessages(prev => [...prev, {
+  id: crypto.randomUUID(),
+  role: 'assistant',
+  content: `⚠️ ${errData.message || 'Không thể kết nối AI. Vui lòng thử lại.'}`,
+  conversation_id: '',
+  created_at: new Date().toISOString(),
+}])
 ```
 
-**Giả thuyết (kiểm tra theo thứ tự):**
+#### 1.4. Kiểm tra Supabase.ai.Session embedding
+```typescript
+// Dòng 163 trong chat/index.ts:
+const aiSession = new Supabase.ai.Session('gte-small');
+```
+→ Nếu Supabase không có `gte-small` model trên FREE tier → crash toàn bộ flow
+→ Fix: Wrap trong try-catch MẠNH HƠN, nếu embedding fail → skip RAG, vẫn chat bình thường
 
-1. **RLS chặn UPDATE** — table `profiles` có RLS policy cho phép user UPDATE row của chính mình không? Kiểm tra:
-   ```sql
-   SELECT polname, polcmd, qual, with_check 
-   FROM pg_policies WHERE tablename = 'profiles';
-   ```
-   → Nếu thiếu UPDATE policy → user KHÔNG THỂ update `onboarding_completed` → supabase.update() fail im lặng → `refreshProfile()` lấy data cũ → `ProtectedRoute` block `/chat`
+#### 1.5. Verify rate limit RPC
+```sql
+-- Kiểm tra check_rate_limit function
+SELECT check_rate_limit('some-test-user-id-here');
+```
+→ Nếu RPC fail → tiếp tục vì code đã có try-catch, nhưng VERIFY
 
-2. **fetchingRef deadlock** — `fetchProfile` có `fetchingRef.current` guard. Nếu `fetchingRef.current = true` từ lần init trước (chưa reset do error) → `refreshProfile()` skip fetch → profile context cũ → app freeze
-   → Fix: Reset `fetchingRef.current = false` trước khi fetch trong `refreshProfile`
+#### 1.6. TEST CHAT sau khi fix:
+1. Login Google → vào /chat
+2. Gõ "Xin chào" → nhấn Send
+3. Phải thấy: user bubble + streaming AI response
+4. Console: KHÔNG có error 503
 
-3. **ProtectedRoute redirect loop** — Sau `refreshProfile()`, profile state update, navigate tới `/chat`. Nhưng `/chat` bọc trong `ProtectedRoute` check `profile?.onboarding_completed`. Nếu React chưa re-render với profile mới → `onboarding_completed` vẫn `false` → redirect về `/onboarding` → loop vô hình
-
-4. **Error swallowed** — `supabase.update()` trả `{ error }` nhưng code KHÔNG check `error` → fail im lặng
-
----
-
-### BUILD ORDER (thứ tự thực hiện — BẮT BUỘC test/verify từng bước):
-
-#### Phase A: Audit RLS Policies (15 phút)
-1. **Kiểm tra RLS policies cho `profiles`:**
-   ```sql
-   SELECT polname, polcmd, qual::text, with_check::text
-   FROM pg_policies WHERE tablename = 'profiles';
-   ```
-2. **Nếu THIẾU UPDATE policy** → tạo:
-   ```sql
-   CREATE POLICY "Users can update own profile" ON profiles
-     FOR UPDATE USING (auth.uid() = id)
-     WITH CHECK (auth.uid() = id);
-   ```
-3. **Kiểm tra tương tự cho mọi table user cần write:** `conversations`, `messages`, `vault_items`, `usage_daily`, `payments`
-4. **TEST:** Mở Supabase SQL Editor, login thủ công, thử UPDATE profiles set onboarding_completed = true → phải thành công
-
-#### Phase B: Fix OnboardingPage Error Handling (10 phút)
-1. **Check Supabase update result:**
-   ```tsx
-   const { error: updateError } = await supabase
-     .from('profiles').update({...}).eq('id', user.id)
-   
-   if (updateError) {
-     console.error('[Onboarding] Update failed:', updateError)
-     // Show toast error
-     return
-   }
-   ```
-2. **Reset fetchingRef trước refreshProfile:**
-   ```tsx
-   // Trong refreshProfile hoặc trước khi gọi:
-   fetchingRef.current = false
-   await refreshProfile()
-   ```
-3. **Thêm try-catch rõ ràng** với error message tiếng Việt trên UI
-
-#### Phase C: Full Audit — Rà soát toàn bộ flow (30 phút)
-**Em PHẢI rà soát từng file theo checklist này:**
-
-| # | File | Kiểm tra gì | Kết quả |
-|---|------|-------------|---------|
-| 1 | `src/lib/supabase.ts` | Lock bypass, storageKey, flowType pkce | ☐ |
-| 2 | `src/contexts/AuthContext.tsx` | Single listener, currentUserIdRef, safety timeout, fetchingRef deadlock | ☐ |
-| 3 | `src/hooks/useAuth.ts` | Chỉ re-export từ AuthContext, KHÔNG có listener riêng | ☐ |
-| 4 | `src/App.tsx` | AuthProvider wrap đúng, AuthRoute cho /onboarding, ProtectedRoute cho /chat | ☐ |
-| 5 | `src/pages/AuthCallback.tsx` | PKCE recovery, 15s timeout, mounted guard | ☐ |
-| 6 | `src/pages/OnboardingPage.tsx` | Error handling, RLS check, fetchingRef reset | ☐ |
-| 7 | `src/pages/ChatPage.tsx` | Profile/user check, edge function calls | ☐ |
-| 8 | `src/pages/LandingPage.tsx` | Render đúng, không duplicate | ☐ |
-| 9 | `src/index.css` | `.onboarding-*`, `.chat-*`, `.landing-*` classes đầy đủ | ☐ |
-| 10 | `supabase/functions/*/index.ts` | Schema references (public NOT system), error handling | ☐ |
-
-**Với MỖI file báo cáo:**
-- ✅ Pass — không có issue
-- ⚠️ Warning — có issue minor, mô tả
-- 🔴 Critical — có bug, mô tả + fix plan
-
-#### Phase D: Fix tất cả issues tìm được từ Phase C
-- Fix theo thứ tự ưu tiên: 🔴 trước, ⚠️ sau
-- Mỗi fix phải verify ngay (không batch fix rồi verify cuối cùng)
-
-#### Phase E: Build + Deploy (BẮT BUỘC đọc kỹ!)
-1. **Build:**
-   ```bash
-   npm run build
-   ```
-   → PHẢI 0 errors, 0 warnings
-
-2. **⚠️ DEPLOY QUA WRANGLER — KHÔNG PHẢI GIT PUSH:**
-   ```bash
-   npx wrangler pages deploy dist/ --project-name brain2-platform
-   ```
-   > **QUAN TRỌNG:** Cloudflare Pages project `brain2-platform` dùng **Direct Upload** (Git Provider = "No"). 
-   > Push code lên GitHub KHÔNG tự động trigger build trên Cloudflare.
-   > Em PHẢI chạy `wrangler pages deploy` sau khi build.
-
-3. **Verify bundle mới lên production:**
-   ```bash
-   curl -s "https://brain2.thongphan.com/" | grep -o 'index-[A-Za-z0-9_]*\.js'
-   ```
-   → Hash phải KHÁC với production hiện tại
-
-#### Phase F: E2E Smoke Test (SAU KHI DEPLOY — BẮT BUỘC)
-1. **Landing page:** `brain2.thongphan.com` → Hero + Features + Pricing hiện đầy đủ
-2. **Google Login:** Click "Bắt đầu miễn phí" → Google OAuth → redirect callback
-3. **Auth Callback:** Auto-redirect tới /onboarding (new user) hoặc /chat (existing user)
-4. **Onboarding 3 steps:**
-   - Step 1: Nhập tên → "Tiếp tục" ✅
-   - Step 2: Chọn goals → "Tiếp tục" ✅
-   - Step 3: Nhập prompt (optional) → **"Bắt đầu Brain2 🚀"** → PHẢI navigate tới /chat ✅
-5. **Chat page:** Gửi 1 tin nhắn → nhận streaming response từ AI
-6. **Console:** KHÔNG có errors (warnings OK)
-7. **Network:** KHÔNG có infinite request loops
-
-**Nếu BẤT CỨ STEP NÀO fail → FIX ngay, redeploy, test lại. KHÔNG báo "done" khi chưa pass hết.**
+**CRITICAL: Nếu chat vẫn fail sau fix code → vấn đề là ở VERTEX_KEY_API_KEY balance. Báo Antigravity để nạp tiền.**
 
 ---
 
-### CONTEXT & CONSTRAINTS:
+## PHASE 2: FULL FEATURE AUDIT (30 files, 9 features)
 
+Rà soát TỪNG TÍNH NĂNG theo bảng dưới. Với mỗi feature: đọc code → tìm bug → fix → verify.
+
+### Feature Matrix — Audit Checklist
+
+| # | Feature | Frontend Files | Backend (Edge Fn) | Database | Status |
+|---|---------|---------------|-------------------|----------|--------|
+| F1 | **Landing Page** | `pages/LandingPage.tsx` | — | — | ☐ |
+| F2 | **Auth Flow** | `pages/AuthCallback.tsx`, `contexts/AuthContext.tsx`, `hooks/useAuth.ts` | — | `profiles` | ☐ |
+| F3 | **Onboarding** | `pages/OnboardingPage.tsx` | — | `profiles` | ☐ |
+| F4 | **Chat AI** | `components/chat/*` (5 files), `hooks/useChat.ts` | `chat/index.ts` | `conversations`, `messages`, `usage_daily` | ☐ |
+| F5 | **Vault (Notes)** | `components/vault/*` (7 files), `hooks/useVault.ts`, `hooks/useVaultSearch.ts` | `embed/index.ts`, `search-notes/index.ts` | `notes` | ☐ |
+| F6 | **Dashboard** | `components/dashboard/*` (5 files), `hooks/useAnalytics.ts` | `analyze-vault/index.ts`, `recommend/index.ts` | `knowledge_analytics`, `recommendations` | ☐ |
+| F7 | **Import** | `components/import/*` (3 files) | `import-files/index.ts`, `notion-connect/index.ts` | `notes` | ☐ |
+| F8 | **Payment** | `components/payment/*` (2 files), `hooks/useTier.ts` | `payment-webhook/index.ts` | `payments`, `profiles.tier` | ☐ |
+| F9 | **Settings** | `pages/SettingsPage.tsx` | — | `profiles` | ☐ |
+
+### Audit Protocol — Cho MỖI feature:
+
+**Step A: Code Review**
+- Đọc TOÀN BỘ files liên quan
+- Kiểm tra: error handling, edge cases, null checks, RLS compatibility
+- Kiểm tra: UI hiển thị đúng tiếng Việt, dark mode, responsive
+
+**Step B: Runtime Test**  
+- Build local: `npm run dev`
+- Test feature trong browser (hoặc curl nếu backend)
+- Ghi nhận: ✅ Pass / 🔴 Fail / ⚠️ Warning
+
+**Step C: Fix Issues**
+- Fix ngay nếu tìm thấy bug
+- Error handling phải dùng tiếng Việt
+- Mỗi fix → verify lại ngay
+
+**Step D: Report**
+- Ghi kết quả vào KẾT QUẢ PHIÊN ở cuối file này
+
+---
+
+### PHASE 2 CHI TIẾT — Từng Feature:
+
+#### F1: Landing Page
+**Files:** `src/pages/LandingPage.tsx`, `src/index.css` (.landing-*)
+**Checklist:**
+- [ ] Hero section render đúng (gradient, animation)
+- [ ] Features section (4 cards) với icons + descriptions
+- [ ] Pricing section (3 tiers: Free/Pro/VIP) với giá đúng
+- [ ] CTA button "Bắt đầu miễn phí" → link tới Google OAuth
+- [ ] Footer + social links
+- [ ] Performance: No CLS, fast LCP
+
+#### F2: Auth Flow
+**Files:** `AuthContext.tsx`, `useAuth.ts`, `AuthCallback.tsx`, `supabase.ts`, `App.tsx`
+**Checklist:**
+- [ ] Google OAuth: Click login → Google → redirect → /auth/callback
+- [ ] PKCE flow: Code verifier exchange + 15s timeout
+- [ ] AuthCallback: Handle race conditions, mounted guard
+- [ ] AuthContext: Single listener, no infinite loops
+- [ ] Safety timeout: 5s max init
+- [ ] ProtectedRoute: Redirect đúng (unauthenticated → landing, no onboarding → onboarding)
+- [ ] AuthRoute: Redirect đúng (authenticated + onboarded → chat)
+- [ ] Tab close + reopen: Session persist (storageKey `sb-brain2-auth-token`)
+- [ ] Logout: Clear session + redirect landing
+
+#### F3: Onboarding
+**Files:** `OnboardingPage.tsx`
+**Checklist:**
+- [ ] Step 1: Display name input
+- [ ] Step 2: Goals selection (6 options)
+- [ ] Step 3: First prompt (optional)
+- [ ] Submit: Update profile → refreshProfile → navigate /chat
+- [ ] Error handling: Alert/toast if update fails
+- [ ] UI: Progress dots, back button, animations
+
+#### F4: Chat AI (🔴 HIGHEST PRIORITY — đang broken)
+**Frontend files:** `ChatInterface.tsx`, `ChatInput.tsx`, `MessageBubble.tsx`, `ModeSelector.tsx`, `ModelSelector.tsx`, `NoteCreateSuggestion.tsx`, `useChat.ts`, `useConversations.ts`, `ChatPage.tsx`
+**Backend:** `supabase/functions/chat/index.ts`
+**DB tables:** `conversations`, `messages`, `cognitive_tools`, `usage_daily`
+
+**Checklist:**
+- [ ] Welcome state: 4 suggested prompts hiện đúng
+- [ ] Mode selector: 4 modes (Tự do, Chiêm nghiệm, Nghiên cứu, Cố vấn) — data từ `cognitive_tools` table
+- [ ] Model selector: Show models theo tier (free = flash + haiku)
+- [ ] Send message: POST /functions/v1/chat → SSE stream → render progressively
+- [ ] Error 503 handling: KHÔNG xóa user message, hiện error bubble
+- [ ] Rate limiting: Hiện usage badge (X/30 cho free tier)
+- [ ] Conversation management: Create, select, pin, archive, delete
+- [ ] Sidebar: List conversations mới nhất → click load messages
+- [ ] Load messages khi select conversation → render history
+- [ ] Markdown rendering trong MessageBubble
+- [ ] Auto-scroll to bottom on new message
+- [ ] New chat button: Clear messages, reset state
+- [ ] Auto-send first prompt from onboarding
+
+**Edge function `chat/index.ts` audit:**
+- [ ] Auth validation (Bearer token → getUser)
+- [ ] Rate limit check (check_rate_limit RPC)
+- [ ] Tool prompt load từ cognitive_tools
+- [ ] Conversation creation/reuse
+- [ ] Message history load (limit 20)
+- [ ] Vault RAG context (embedding → search_notes RPC) — MUST handle failure gracefully
+- [ ] AI call to vertex-key.com — VERIFY model IDs match API
+- [ ] Fallback model logic
+- [ ] SSE streaming response
+- [ ] Save user + assistant messages WITH user_id
+- [ ] Update conversation last_message_at
+- [ ] Increment usage (increment_usage RPC)
+- [ ] CORS headers correct
+
+#### F5: Vault (Notes Management)
+**Frontend:** `VaultBrowser.tsx`, `NoteList.tsx`, `NoteCard.tsx`, `NoteDetail.tsx`, `NoteEditor.tsx`, `SearchBar.tsx`, `FilterChips.tsx`, `useVault.ts`, `useVaultSearch.ts`
+**Backend:** `embed/index.ts`, `search-notes/index.ts`
+**DB:** `notes` table
+
+**Checklist:**
+- [ ] List notes: Load user's notes, paginated (200 limit)
+- [ ] Filter by type (concept, insight, reflection, experience, project, other)
+- [ ] Filter by maturity (seed, growing, mature)
+- [ ] Filter by domain
+- [ ] Search: Keyword search + semantic search (via search-notes edge fn)
+- [ ] Create note: Title, content, type, domain, maturity
+- [ ] Edit note: Inline editing, auto-save
+- [ ] Delete note: Soft delete (set deleted_at)
+- [ ] Note detail: Full content view with markdown rendering
+- [ ] Embedding: After create/update → trigger embed edge function
+- [ ] RLS: notes table has SELECT, INSERT, UPDATE policies
+
+#### F6: Knowledge Dashboard
+**Frontend:** `KnowledgeDashboard.tsx`, `RadarChart.tsx`, `MaturityChart.tsx`, `StatsCards.tsx`, `RecommendationCards.tsx`, `UsageStats.tsx`, `useAnalytics.ts`
+**Backend:** `analyze-vault/index.ts`, `recommend/index.ts`
+**DB:** `knowledge_analytics`, `recommendations`
+
+**Checklist:**
+- [ ] Radar chart: 6 dimensions of knowledge strength
+- [ ] Maturity distribution: pie/bar chart (seed vs growing vs mature)
+- [ ] Stats cards: Total notes, domains, avg maturity, connections
+- [ ] Recommendations: AI-generated suggestions for learning
+- [ ] Usage stats: Messages today, notes created, AI cost
+- [ ] Edge function analyze-vault: Returns analytics data
+- [ ] Edge function recommend: Returns personalized recommendations
+- [ ] Error states: Empty vault, loading skeleton, error message
+
+#### F7: Import
+**Frontend:** `ImportManager.tsx`, `FileImport.tsx`, `NotionImport.tsx`
+**Backend:** `import-files/index.ts`, `notion-connect/index.ts`
+
+**Checklist:**
+- [ ] File upload: Accept .md, .txt files
+- [ ] Notion OAuth: Connect → import pages
+- [ ] Progress indicator during import
+- [ ] Error handling: File too large, invalid format
+- [ ] Notes created correctly in DB after import
+- [ ] Embeddings triggered for imported notes
+
+#### F8: Payment
+**Frontend:** `PaymentFlow.tsx`, `PaymentStatus.tsx`, `useTier.ts`
+**Backend:** `payment-webhook/index.ts`
+**DB:** `payments`, `profiles`
+
+**Checklist:**
+- [ ] Show current tier (Free/Pro/VIP) with pricing
+- [ ] Transaction code: B2-{userId} format
+- [ ] VIB bank info: PHAN MINH THÔNG — 002031988
+- [ ] Payment flow: Select tier → show transfer info → wait for confirmation
+- [ ] Webhook: Parse Gmail → match transaction → upgrade tier
+- [ ] PaymentStatus: Show pending/completed/failed
+- [ ] Tier configs correct (Free: 30 msg/day, Pro: 200, VIP: unlimited)
+- [ ] Rate limit by tier works correctly
+
+#### F9: Settings
+**Frontend:** `SettingsPage.tsx`
+
+**Checklist:**
+- [ ] View profile info (name, email, tier)
+- [ ] Edit display name
+- [ ] Change usage goals  
+- [ ] Logout button
+- [ ] Delete account (if implemented)
+- [ ] Dark mode (default, no toggle needed per design decision)
+
+---
+
+## PHASE 3: PRODUCTION HARDENING
+
+### 3.1. Error Boundary
+- [ ] `ErrorBoundary.tsx` wraps tất cả routes
+- [ ] Fallback UI hiển thị message tiếng Việt
+- [ ] Auto-report errors (console.error minimum)
+
+### 3.2. Loading States
+- [ ] Skeleton components cho mọi async data load
+- [ ] No flash of unstyled content
+- [ ] Loading spinner cho form submissions
+
+### 3.3. Edge Cases
+- [ ] Empty vault: Show proper empty state
+- [ ] No conversations: Show welcome screen
+- [ ] Expired session: Auto-redirect to login
+- [ ] Network offline: Graceful degradation
+- [ ] Rate limit hit: Clear message + upgrade CTA
+
+### 3.4. CSS Audit
+- [ ] All `.landing-*`, `.chat-*`, `.onboarding-*`, `.vault-*`, `.dashboard-*`, `.settings-*` classes exist
+- [ ] No orphan CSS (styles without matching component)
+- [ ] Dark mode colors consistent
+- [ ] Scrollbar styling
+- [ ] Input focus states
+
+### 3.5. TypeScript
+- [ ] `npm run build` → 0 errors, 0 warnings
+- [ ] No `any` types unless absolutely necessary
+- [ ] All interfaces defined in `lib/types.ts`
+
+### 3.6. Security Audit
+- [ ] All edge functions validate auth token
+- [ ] CORS headers correct (allow brain2.thongphan.com)
+- [ ] No secrets exposed in frontend code
+- [ ] RLS enabled on every table with user data
+- [ ] Service role key ONLY in edge functions, NEVER in frontend
+
+---
+
+## PHASE 4: BUILD & DEPLOY
+
+### 4.1. Build
+```bash
+npm run build
+```
+→ PHẢI 0 errors, 0 warnings
+
+### 4.2. Deploy edge functions (NẾU có thay đổi)
+```bash
+# Chỉ deploy functions đã sửa code:
+npx supabase functions deploy chat --project-ref sauuvyffudkmdbeglspb
+npx supabase functions deploy embed --project-ref sauuvyffudkmdbeglspb
+# ... thêm functions khác nếu sửa
+```
+**⚠️ IMPORTANT:** Edge function `chat` có `verify_jwt: false` — giữ nguyên vì function tự verify via `getUser()`. KHÔNG bật verify_jwt vì sẽ break custom auth flow.
+
+### 4.3. Deploy frontend
+```bash
+npx wrangler pages deploy dist/ --project-name brain2-platform
+```
+> **⚠️ CRITICAL:** Cloudflare Pages project dùng **Direct Upload**. Git push KHÔNG auto-deploy.
+
+### 4.4. Verify deployment
+```bash
+curl -s "https://brain2.thongphan.com/" | grep -o 'index-[A-Za-z0-9_-]*\.js' | head -1
+```
+→ Hash phải KHÁC `index-0cd_0-R5.js` (bundle hiện tại)
+
+---
+
+## PHASE 5: E2E SMOKE TEST (BẮT BUỘC — không được skip)
+
+### Test Sequence — mỗi step PHẢI pass:
+
+| # | Test | Action | Expected | Status |
+|---|------|--------|----------|--------|
+| T1 | Landing | Visit brain2.thongphan.com | Hero + Features + Pricing render | ☐ |
+| T2 | Login | Click "Bắt đầu miễn phí" | Google OAuth popup | ☐ |
+| T3 | Callback | Complete Google login | Redirect to /onboarding (new) or /chat (existing) | ☐ |
+| T4 | Onboarding | Complete 3 steps | Navigate to /chat | ☐ |
+| T5 | Chat Send | Type "Xin chào" → Send | User bubble appears | ☐ |
+| T6 | Chat Response | Wait for AI | Streaming response appears | ☐ |
+| T7 | Chat Error | If 503 | Error message shown, user msg NOT deleted | ☐ |
+| T8 | New Chat | Click + button | Messages cleared, welcome screen | ☐ |
+| T9 | Mode Switch | Change mode | Mode indicator updates | ☐ |
+| T10 | Vault | Navigate to /vault | Notes list or empty state | ☐ |
+| T11 | Note Create | Click create | Note form, save works | ☐ |
+| T12 | Dashboard | Navigate to /dashboard | Charts/stats render | ☐ |
+| T13 | Settings | Navigate to /settings | Profile info displayed | ☐ |
+| T14 | Sidebar | Click conversation | Load messages history | ☐ |
+| T15 | Console | Check DevTools | No critical errors | ☐ |
+| T16 | Nav Guards | Visit /chat unauthenticated | Redirect to landing | ☐ |
+
+**Nếu BẤT CỨ test nào FAIL → FIX ngay, redeploy, test lại. KHÔNG báo "done" khi chưa pass HẾT.**
+
+---
+
+## CONTEXT & CONSTRAINTS
+
+### Infrastructure:
 - **Supabase project:** `sauuvyffudkmdbeglspb` (FREE tier)
 - **Custom domain:** `brain2.thongphan.com` (Cloudflare Pages)
-- **Cloudflare Pages project:** `brain2-platform` (⚠️ Direct Upload, KHÔNG auto-deploy từ Git)
+- **Cloudflare Pages project:** `brain2-platform` (⚠️ Direct Upload)
 - **Git remote:** `brain2-origin` → `github.com/thongphan23/brain2-app.git`
-- **Deploy command:** `npx wrangler pages deploy dist/ --project-name brain2-platform`
-- **Build command:** `npm run build` (= `tsc -b && vite build`)
-- **Edge Functions:** Already deployed via Supabase, KHÔNG cần redeploy (trừ khi sửa code)
-- **Google OAuth:** ĐÃ configured đầy đủ trên Supabase Dashboard
-- **Secrets Edge Functions:** 7 secrets đã set
+- **AI Proxy:** `https://vertex-key.com/api/v1` (OpenAI-compatible)
+
+### Commands:
+- **Build:** `npm run build`
+- **Dev:** `npm run dev`
+- **Deploy frontend:** `npx wrangler pages deploy dist/ --project-name brain2-platform`
+- **Deploy edge fn:** `npx supabase functions deploy [name] --project-ref sauuvyffudkmdbeglspb`
+- **Deploy ALL edge fns:** `for fn in chat embed recommend search-notes analyze-vault import-files payment-webhook; do npx supabase functions deploy $fn --project-ref sauuvyffudkmdbeglspb; done`
+
+### Database Tables (public schema):
+`cognitive_tools`, `conversations`, `knowledge_analytics`, `messages`, `notes`, `payments`, `profiles`, `recommendations`, `usage_daily`, `vault_kv`
+
+### Database Functions (RPCs):
+- `check_rate_limit(p_user_id uuid)` — Rate limiting
+- `increment_usage(p_user_id uuid, p_input_tokens int, p_output_tokens int, p_cost_usd float)` — Track usage
+- `search_notes(query_embedding vector, match_threshold float, match_count int, p_user_id uuid)` — Semantic search
+
+### RLS Status (all verified ✅):
+- `profiles`: SELECT + INSERT + UPDATE ✅
+- `conversations`: SELECT + INSERT + UPDATE ✅
+- `messages`: SELECT + INSERT ✅
+- `notes`: SELECT + INSERT + UPDATE ✅
+- `cognitive_tools`: SELECT (public) ✅
+- `payments`: SELECT + INSERT + UPDATE ✅
+- `knowledge_analytics`: SELECT + INSERT + UPDATE ✅
+- `recommendations`: SELECT + INSERT + UPDATE + DELETE ✅
+- `usage_daily`: SELECT + INSERT + UPDATE ✅
+- `vault_kv`: RLS enabled, NO policies (only backend access) ✅
+
+### Edge Functions Deployed:
+| Slug | Version | JWT | Status |
+|------|---------|-----|--------|
+| chat | v27 | false | ACTIVE |
+| embed | v8 | false | ACTIVE |
+| recommend | v6 | false | ACTIVE |
+| search-notes | v2 | false | ACTIVE |
+| analyze-vault | v2 | false | ACTIVE |
+| import-files | v2 | false | ACTIVE |
+| payment-webhook | v3 | false | ACTIVE |
+| notion-connect | v11 | false | ACTIVE |
+| admin-dashboard | v2 | false | ACTIVE |
+| backfill | v6 | false | ACTIVE |
+
+### Secrets (7 set on Supabase):
+`VERTEX_KEY_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PAYMENT_WEBHOOK_SECRET`, `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`, `VIB_WEBHOOK_SECRET`
 
 ---
 
-### ACCEPTANCE CRITERIA:
+## ACCEPTANCE CRITERIA
 
 - [ ] AC-1: Landing page hiện đầy đủ Hero + Features + Pricing
-- [ ] AC-2: Google OAuth flow hoàn tất → redirect onboarding/chat
-- [ ] AC-3: Onboarding 3 steps → nhấn "Bắt đầu Brain2 🚀" → navigate tới /chat (KHÔNG ĐỨNG)
-- [ ] AC-4: /chat page load + AI streaming response hoạt động
-- [ ] AC-5: Console KHÔNG có Lock/PKCE/infinite errors
-- [ ] AC-6: `npm run build` → 0 errors
-- [ ] AC-7: Full audit checklist Phase C — TẤT CẢ files pass ✅
-- [ ] AC-8: Deploy qua wrangler → bundle hash mới trên production
-- [ ] AC-9: RLS policies đủ cho mọi table user cần access
+- [ ] AC-2: Google OAuth flow hoàn tất
+- [ ] AC-3: Onboarding 3 steps → navigate /chat (KHÔNG freeze)
+- [ ] AC-4: **Chat: User gửi tin nhắn → AI trả lời streaming** (BUG 12 FIXED)
+- [ ] AC-5: Chat: Error 503 → hiện error bubble, KHÔNG xóa user message
+- [ ] AC-6: Vault: List/Create/Edit/Delete notes hoạt động
+- [ ] AC-7: Dashboard: Charts + Stats render
+- [ ] AC-8: Settings: View + Edit profile
+- [ ] AC-9: Navigation guards: Protected routes redirect đúng
+- [ ] AC-10: Console: KHÔNG có critical errors
+- [ ] AC-11: `npm run build` → 0 errors
+- [ ] AC-12: Deploy qua wrangler → bundle hash mới
+- [ ] AC-13: E2E tests T1-T16 PASS HẾT
+- [ ] AC-14: RLS verified cho mọi table
+- [ ] AC-15: Conversation sidebar: List + Select + Load history
+- [ ] AC-16: Rate limiting works (free = 30 msg/day)
 
 ---
 
@@ -294,104 +522,56 @@ const handleComplete = async () => {
 | Lock bypass | No-op lock function | Fix Navigator Locks deadlock |
 | Schema | `public` schema for all tables | Supabase client default |
 | Deploy | `wrangler pages deploy` | Direct Upload project |
+| Edge function JWT | `verify_jwt: false` | Functions self-verify via getUser() |
 
 ---
 
 ## 📝 KẾT QUẢ PHIÊN
 
+<!-- Claude Code: ghi kết quả ở ĐẦU mục này, MỖI PHIÊN MỘT ENTRY -->
+<!-- Format: ### YYYY-MM-DD HH:MM — [Tóm tắt] -->
+<!-- BẮT BUỘC ghi: Status, files đã sửa, AC đạt, issues còn lại -->
+
+### 2026-04-08 15:40 — Antigravity tạo handoff v3.0 FULL STABILIZATION
+**Ai ghi:** Antigravity
+**Status:** 🔴 Giao Claude Code — MEGA TASK
+
+**Context:**
+- BUG 12: Chat trả 503 — vertex-key.com API fail hoặc model ID sai
+- User báo: "chat mất đoạn tin, không phản hồi"
+- Edge function logs xác nhận: `POST | 503 | /functions/v1/chat`
+- Frontend xóa user message khi nhận error → user thấy "mất chat"
+
+**Tạo handoff v3.0** — 5 phases:
+1. Fix Chat (CRITICAL)
+2. Full Feature Audit (9 features, 30+ files)
+3. Production Hardening (error boundary, loading, CSS, TypeScript)
+4. Build & Deploy (wrangler + edge functions)
+5. E2E Smoke Test (16 tests)
+
+---
+
 ### 2026-04-08 14:00 — Claude Code: BUG 11 Fixed + Deployed ✅
 **Ai ghi:** Claude Code
-**Status:** ✅ Phase A+B+D+E done — cần chạy RLS migration trên Supabase Dashboard
+**Status:** ✅ Phase A+B+D+E done
 
-**Đã làm:**
-
-**Phase A — RLS Audit:**
-- Không thể query trực tiếp (chưa link supabase CLI)
-- Tạo migration file: `supabase/migrations/20260408000000_add_profiles_update_policy.sql`
-
-**Phase C — Full Audit 10 files:**
-- `supabase.ts` ✅ OK (lock bypass, PKCE, storageKey)
-- `AuthContext.tsx` ✅ (fetchingRef deadlock → đã fix)
-- `useAuth.ts` ✅ OK
-- `App.tsx` ✅ OK
-- `AuthCallback.tsx` ✅ OK
-- `OnboardingPage.tsx` 🔴 → fix rồi
-- `ChatPage.tsx` ✅ OK
-- `LandingPage.tsx` ✅ OK
-- `index.css` ✅ OK
-- Edge functions ✅ OK
-
-**Phase D — Fixes:**
-1. `AuthContext.fetchProfile`: Reset `fetchingRef.current = false` ở ĐẦU hàm (prevents deadlock khi bị stuck true)
-2. `OnboardingPage.handleComplete`: Check `{error}` từ supabase.update(), early return nếu fail
+**Fixes:**
+1. `AuthContext.fetchProfile`: Reset `fetchingRef.current = false`
+2. `OnboardingPage.handleComplete`: Check `{error}` + alert()
 3. Tạo RLS UPDATE policy migration SQL
+4. Build 0 errors, Deploy via wrangler
 
-**Phase E — Build + Deploy:**
-- `npm run build` → 0 errors ✅ (bundle: index-DhCkPRgG.js)
-- `wrangler pages deploy` → ✅ Deployed to brain2-platform
-- Production hash: `index-DhCkPRgG.js` (mới, khác `index-CuyJJnrq.js`)
-
-**AC đạt:**
-- [x] AC-1: Landing page hiện đầy đủ ✅
-- [x] AC-6: `npm run build` → 0 errors ✅
-- [x] AC-7: Full audit Phase C — TẤT CẢ files pass ✅
-- [x] AC-8: Deploy qua wrangler → bundle hash mới ✅
-
-**⚠️ CẦN THỦ CÔNG:**
-Anh cần vào **Supabase Dashboard → SQL Editor** → paste file:
-`supabase/migrations/20260408000000_add_profiles_update_policy.sql` → Run
-
-Sau đó test E2E:
-1. Login Google → redirect /auth/callback
-2. Onboarding 3 steps → nhấn "Bắt đầu Brain2 🚀"
-3. Phải navigate tới /chat (không freeze)
+**AC đạt:** AC-1 ✅, AC-6 ✅, AC-7 ✅, AC-8 ✅
 
 ---
 
-### 2026-04-08 13:40 — BUG 11: Onboarding freeze khi submit
+### 2026-04-08 11:40 — Antigravity fix BUG 7-10 + deploy
 **Ai ghi:** Antigravity
-**Status:** 🔴 Giao Claude Code audit + fix
-
-**Mô tả:** Onboarding form hiện đúng (Step 1: tên, Step 2: goals, Step 3: prompt). Nhưng khi nhấn "Bắt đầu Brain2 🚀" → UI đứng, không navigate tới /chat.
-
-**Tạo handoff v2.0** yêu cầu:
-1. Fix BUG 11 (onboarding freeze)
-2. FULL AUDIT 10 files core
-3. E2E test pass tất cả 7 steps
-4. Deploy qua wrangler (KHÔNG git push)
+**Fixes:** AuthRoute, currentUserIdRef, 5s safety timeout, wrangler deploy
 
 ---
 
-### 2026-04-08 11:40 — Wrangler deploy thành công + Onboarding hiện OK
-**Ai ghi:** Antigravity (trực tiếp fix + deploy)
-**Status:** 🟢 Onboarding form HIỆN — nhưng freeze khi submit
-
-**Fixes:**
-- BUG 7: Tạo `AuthRoute` cho `/onboarding` (commit `29b8fbb`)
-- BUG 8: Track `currentUserIdRef`, skip TOKEN_REFRESHED events (commit `68367d9`)
-- BUG 9: 5s safety timeout cho auth init (commit `7c56d36`)
-- BUG 10: Deploy qua `npx wrangler pages deploy dist/ --project-name brain2-platform`
-
-**Verification:**
-- ✅ Landing page render đầy đủ (Firecrawl + browser confirm)
-- ✅ Onboarding form hiện (screenshot: 🧠 "Chào mừng đến Brain2!", input, button)
-- ✅ Bundle mới `index-CuyJJnrq.js` trên production
-- ❌ Submit onboarding → FREEZE
-
----
-
-### 2026-04-08 10:15 — AUDIT FIX: Bugs 1-6 resolved
+### 2026-04-08 10:15 — Claude Code fix BUG 1-6
 **Ai ghi:** Claude Code
-**Status:** ✅ 6 bugs fixed, push lên GitHub
-
-**Fixes:**
-1. ✅ `src/contexts/AuthContext.tsx` — Tạo: single `onAuthStateChange` listener
-2. ✅ `src/hooks/useAuth.ts` — Refactor: re-export từ context
-3. ✅ `src/App.tsx` — Wrap `<AuthProvider>` bọc `<AppRoutes>`
-4. ✅ `src/pages/AuthCallback.tsx` — 15s timeout + PKCE recovery
-5. ✅ `src/LandingPage.tsx` (orphan) — Xóa
-6. ✅ `src/LandingPage.css` (orphan) — Xóa
-7. ✅ Migration file tạo (chưa chạy)
-8. ✅ Build 0 errors
-
-**Commit:** `b72e5ec` — "fix: auth context refactor + PKCE hardening + schema fix"
+**Fixes:** AuthContext refactor, PKCE hardening, orphan cleanup
+**Commit:** `b72e5ec`

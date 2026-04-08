@@ -30,34 +30,28 @@ export function OnboardingPage() {
     setLoading(true)
 
     try {
-      // Use update-profile edge function (service role → bypasses RLS)
-      const session = await supabase.auth.getSession()
-      const token = session.data.session?.access_token
-
-      if (!token) {
-        console.error('[Onboarding] No session token')
-        setLoading(false)
-        return
-      }
-
-      const { error: callError } = await supabase.functions.invoke('update-profile', {
-        body: {
+      // Step 1: Direct Supabase update — relies on RLS policy
+      // RLS policy must allow user to UPDATE their own profile row
+      // See: supabase/migrations/20260408000000_add_profiles_update_policy.sql
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
           display_name: displayName || user.user_metadata?.name || user.email?.split('@')[0],
           usage_goals: selectedGoals,
           onboarding_completed: true,
-        },
-        headers: { Authorization: `Bearer ${token}` },
-      })
+        })
+        .eq('id', user.id)
 
-      if (callError) {
-        console.error('[Onboarding] Edge function error:', callError)
+      if (updateError) {
+        console.error('[Onboarding] Profile update failed:', updateError.message)
+        // Show visible error to user instead of silently failing
+        alert('Không thể lưu thông tin. Vui lòng thử lại.')
         setLoading(false)
         return
       }
 
       await refreshProfile()
 
-      // Save first prompt for ChatPage to auto-send
       if (firstPrompt.trim()) {
         sessionStorage.setItem(ONBOARDING_PROMPT_KEY, firstPrompt.trim())
       }
