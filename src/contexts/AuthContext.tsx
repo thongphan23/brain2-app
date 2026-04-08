@@ -80,6 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, fetchProfile])
 
   // ── SINGLE auth listener — the ONLY one in the entire app ──
+  // CRITICAL: Track user ID to prevent infinite fetch loop.
+  // Without lock protection, onAuthStateChange fires frequently
+  // (TOKEN_REFRESHED, etc). We must only fetch profile when
+  // the user ID actually changes, not on every event.
+  const currentUserIdRef = useRef<string | null>(null)
+
   useEffect(() => {
     let mounted = true
 
@@ -92,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(currentUser)
 
         if (currentUser) {
+          currentUserIdRef.current = currentUser.id
           await createProfileIfNeeded(currentUser)
           await fetchProfile(currentUser.id)
         }
@@ -110,14 +117,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mounted) return
 
         const currentUser = session?.user ?? null
-        setUser(currentUser)
 
-        if (currentUser) {
-          await createProfileIfNeeded(currentUser)
-          await fetchProfile(currentUser.id)
-        } else {
+        // SIGNED_OUT → clear everything
+        if (!currentUser) {
+          currentUserIdRef.current = null
+          setUser(null)
           setProfile(null)
+          setLoading(false)
+          return
         }
+
+        // Same user → just update user object, skip profile re-fetch
+        // This prevents infinite loop from TOKEN_REFRESHED events
+        if (currentUser.id === currentUserIdRef.current) {
+          setUser(currentUser)
+          return
+        }
+
+        // New user (SIGNED_IN) → fetch profile
+        currentUserIdRef.current = currentUser.id
+        setUser(currentUser)
+        await createProfileIfNeeded(currentUser)
+        await fetchProfile(currentUser.id)
+        if (mounted) setLoading(false)
       }
     )
 
