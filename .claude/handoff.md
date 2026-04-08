@@ -1,32 +1,35 @@
-# 📋 Sổ Bàn Giao — Brain2 Platform
+# 📋 Sổ Bàn Giao v2.0 — Brain2 Platform
 
 > File này là kênh giao tiếp 2 chiều giữa Antigravity (PM) và Claude Code (Builder).
-> ⚠️ File này là NGUỒN SỰ THẬT DUY NHẤT sau khi /clear — đọc kỹ trước khi làm.
+> ⚠️ File này là NGUỒN SỰ THẬT DUY NHẤT sau khi /clear — đọc KỸ trước khi làm.
 
 ---
 
 ## 🗺️ TRẠNG THÁI HIỆN TẠI
 
-**Cập nhật lần cuối:** 2026-04-08 09:35
-**Phiên bản hiện tại:** v1.1 — PRODUCTION DEPLOYED nhưng có BUG NGHIÊM TRỌNG
-**Tình trạng chung:** 🔴 CRITICAL — App treo/đen xì sau khi login, cần audit toàn diện
+**Cập nhật lần cuối:** 2026-04-08 13:40
+**Phiên bản:** v2.0 — Onboarding hiện OK nhưng ĐỨNG khi nhấn Lưu
+**Tình trạng chung:** 🟡 CRITICAL — Landing page OK, Onboarding hiện OK, nhưng FREEZE khi submit
 
-### Đã xong (từ v1.0):
-- Phase 1-7: Build hoàn tất (112 modules, 220KB main bundle, 0 build errors)
-- Phase 8: Deploy lên Cloudflare Pages (`brain2.thongphan.com`)
-- 7 Edge Functions deployed trên Supabase
-- Google OAuth configured trên Supabase Dashboard
-- DB migrations chạy xong (public + system schemas)
+### Đã fix (qua 2 phiên audit, 10 bugs):
+1. ✅ BUG 1: Code chưa push → đã push tất cả commits
+2. ✅ BUG 2: Multiple auth listeners → AuthContext single listener
+3. ✅ BUG 3: Schema duplication → migration file tạo (CHƯA CHẠY)
+4. ✅ BUG 4: Orphan LandingPage files → xóa 29KB
+5. ✅ BUG 5: PKCE fragile → 15s timeout + error recovery
+6. ✅ BUG 6: Onboarding blank → hệ quả Bug 2+7+8, đã fix
+7. ✅ BUG 7: Infinite redirect loop → `/onboarding` dùng AuthRoute thay ProtectedRoute
+8. ✅ BUG 8: Infinite profile fetch → track currentUserIdRef, skip TOKEN_REFRESHED
+9. ✅ BUG 9: Loading spinner vĩnh viễn → 5s safety timeout
+10. ✅ BUG 10: Cloudflare Pages = Direct Upload, không auto-deploy → dùng wrangler
 
-### ĐANG LỖI — Triệu chứng:
-1. **Trang landing** — đôi khi hiện BLANK (đen xì) thay vì Hero page, chỉ thấy spinner ⏳
-2. **Sau khi login** — Google OAuth redirect về OK nhưng trang Onboarding BLANK (đen xì, page height = viewport = 813px, không có content)
-3. **Console errors** — `Lock "lock:sb-...auth-token" was released because another request stole it` + `AuthPKCECodeVerifierMissingError`
-4. **Localhost references** — Production build vẫn chứa đường dẫn `http://localhost:5173/node_modules/.vite/deps/...`
+### ĐANG LỖI — BUG 11 (MỚI):
+**Triệu chứng:** Onboarding hiện form OK (3 steps: tên, goals, first prompt). Khi nhấn nút **"Bắt đầu Brain2 🚀"** ở Step 3 → **giao diện ĐỨNG** (freeze, không navigate tới /chat).
 
-### Hướng tiếp cận hiện tại:
-- Antigravity đã patch no-op lock function + storageKey CỐ ĐỊNH nhưng bản fix CHƯA ĐƯỢC PUSH lên GitHub → Cloudflare Pages chưa deploy bản mới
-- Cần Claude Code audit TOÀN DIỆN: auth flow, rendering, schema mismatch, cleanup files thừa, rồi push + deploy
+**Root cause khả năng nhất:**
+1. `handleComplete()` → `refreshProfile()` → gọi `fetchProfile()` → `fetchingRef.current` vẫn `true` (bị khóa từ lần init trước) → SKIP → profile không refresh → `ProtectedRoute` thấy `onboarding_completed: false` → redirect lại /onboarding → LOOP
+2. Hoặc `supabase.from('profiles').update(...)` fail do RLS policy chưa cho phép user UPDATE chính mình
+3. Hoặc `refreshProfile()` update profile state → `onAuthStateChange` không fire → profile context vẫn cũ → navigation tới /chat bị ProtectedRoute block → redirect vòng
 
 ---
 
@@ -54,156 +57,168 @@
 
 **PRD file:** `.claude/prd/PRD_brain2-platform-rebuild.md`
 **PRD Status:** Approved ✅
-**Key sections:** Section 8 (System Design), Section 9 (Design System), Section 11 (Patterns)
 
 ---
 
-## ⚡ TASK HIỆN TẠI — FULL AUDIT + FIX PRODUCTION BUGS
+## ⚡ TASK HIỆN TẠI — AUDIT TOÀN DIỆN + FIX BUG 11
 
-### 🔲 AUDIT & FIX — Brain2 Production
-**Giao bởi:** Antigravity | **Ngày:** 2026-04-08
-**Loại:** Critical Bug Fix + Production Stabilization
-**Ưu tiên:** 🔴 CRITICAL — App không sử dụng được
-
----
-
-### VẤN ĐỀ GỐC (Root Causes) — 6 issues đã xác định:
-
-#### BUG 1: 🔴 CRITICAL — Code fix CHƯA push lên GitHub
-**Bằng chứng:** `git log` cho thấy HEAD local ở commit `c813161` nhưng `brain2-origin/main` ở commit `4a999f4` (cũ hơn 2 commits).
-**Tác động:** Bản fix Navigator Locks bypass VÀ payment-webhook modernize chưa có trên production.
-**Files:** `src/lib/supabase.ts` (lock bypass + storageKey)
-
-#### BUG 2: 🔴 CRITICAL — Multiple useAuth() instances gây duplicate auth listeners
-**Bằng chứng:** Trong `App.tsx`:
-- `LandingRoute` component gọi `useAuth()` (dòng 61)
-- `ProtectedRoute` component gọi `useAuth()` (dòng 22)
-- Mỗi lần `useAuth()` tạo một `supabase.auth.onAuthStateChange()` listener MỚI
-- Khi navigate giữa routes → listeners chồng chéo → lock conflict
-**Lý do sâu:** React mỗi khi mount component sẽ run useEffect, tạo listener mới. Khi unmount → cleanup. Nhưng nếu có multiple instances cùng lúc (LandingRoute check loading TRONG KHI ProtectedRoute cũng check) → race condition trên auth lock.
-**Fix đề xuất:** Chuyển auth state lên React Context (AuthProvider) wrapping toàn bộ App. useAuth() chỉ consume context, KHÔNG tạo listener mới.
-
-#### BUG 3: 🟡 MEDIUM — Schema duplication (public vs system)
-**Bằng chứng:** Database có tables trùng nhau ở 2 schemas:
-- `public.payments` VÀ (handoff cũ nói tạo ở `system.payments`)
-- `public.usage_daily` VÀ `system.usage_daily`
-- `public.knowledge_analytics` VÀ `public.recommendations` (ở public)
-- `system.recommendations` VÀ `system.usage_daily` (ở system)
-
-**Vấn đề:** Edge functions (payment-webhook dòng 55) query `from('payments')` → Supabase client mặc định dùng schema `public`. Nhưng migration gốc tạo ở `system`. Cần thống nhất — nên dùng `public` cho tất cả vì Supabase client SDK mặc định query `public`.
-
-#### BUG 4: 🟡 MEDIUM — Duplicate LandingPage files
-**Bằng chứng:**
-- `src/LandingPage.tsx` (15,605 bytes) — imports `./LandingPage.css`
-- `src/pages/LandingPage.tsx` (6,630 bytes) — KHÔNG import CSS
-- `App.tsx` dòng 9: `import { LandingPage } from './pages/LandingPage'`
-- Tức là App sử dụng bản 6.6KB KHÔNG CÓ CSS → landing page styling bị thiếu hoặc phụ thuộc global CSS
-- Bản 15KB ở `src/` là orphan (không được import) nhưng vẫn bị bundle
-
-**Fix:** Xóa `src/LandingPage.tsx` + `src/LandingPage.css` (orphans). Verify `src/pages/LandingPage.tsx` có đủ styling từ `index.css`.
-
-#### BUG 5: 🟡 MEDIUM — AuthCallback PKCE fragile
-**Bằng chứng:** Console error `AuthPKCECodeVerifierMissingError` khi redirect từ Google về.
-**Nguyên nhân:** `code_verifier` trong localStorage bị mất hoặc bị overwrite giữa lúc redirect.
-**Fix:** Thêm retry logic + graceful fallback trong `AuthCallback.tsx`. Nếu PKCE fail → clear storage + redirect về landing với thông báo "Vui lòng đăng nhập lại".
-
-#### BUG 6: 🟢 LOW — Onboarding page layout
-**Bằng chứng:** browser truy cập `/onboarding` → page height = viewport (813px), tức là content không render hoặc CSS invisible.
-**Nguyên nhân có thể:** 
-  - CSS class `.onboarding` thiếu styles (check `index.css`)
-  - Hoặc thực chất là BUG 2 (useAuth loading vĩnh viễn → ProtectedRoute trả spinner thay vì OnboardingPage)
+### 🔲 FULL AUDIT + FIX — Brain2 Production
+**Giao bởi:** Antigravity | **Ngày:** 2026-04-08 13:40
+**Loại:** Critical Bug Fix + Full Code Audit
+**Ưu tiên:** 🔴 CRITICAL — App đứng khi submit onboarding, không dùng được
 
 ---
 
-### BUILD ORDER (thứ tự thực hiện — PHẢI có test/verify):
+### 🔴 BUG 11: Onboarding Freeze khi nhấn "Bắt đầu Brain2 🚀"
 
-#### Phase A: Fix Auth Architecture (BUG 2 — quan trọng nhất)
-1. **Tạo `src/contexts/AuthContext.tsx`** — AuthProvider + useAuth refactor
-   - Move toàn bộ logic từ `hooks/useAuth.ts` vào AuthContext
-   - `useAuth()` hook chỉ consume context, KHÔNG tạo listener
-   - Provider wrap toàn App (trong `App.tsx`)
-   - ĐẢMBẢO chỉ có 1 `onAuthStateChange` listener duy nhất
-2. **Update `App.tsx`** — Wrap `<AuthProvider>` bọc `<BrowserRouter>`
-   - LandingRoute + ProtectedRoute dùng `useAuth()` từ context (không tạo listener mới)
-3. **Update `hooks/useAuth.ts`** — Export hook trỏ về context
-4. **TEST:** `npm run dev` → mở localhost → F12 Console → KHÔNG có lỗi lock conflict
-5. **TEST:** Mở 2 tabs cùng lúc → không crash
+**Triệu chứng:**
+- Onboarding form hiện OK (3 steps: tên, goals, first prompt)
+- Khi nhấn nút cuối cùng "Bắt đầu Brain2 🚀" → giao diện ĐỨNG
+- Không navigate tới /chat, không có error visible trên UI
+- Button có thể stuck ở trạng thái "Đang lưu..."
 
-#### Phase B: Verify & Harden Supabase Client (BUG 1)
-1. **Verify `src/lib/supabase.ts`** — đã có:
-   - `lock: async (_name, _acquireTimeout, fn) => await fn()` (no-op lock bypass)
-   - `storageKey: 'sb-brain2-auth-token'` (fixed key)
-   - `flowType: 'pkce'`
-   - `detectSessionInUrl: true`
-2. Nếu chưa có → thêm vào (đã được patch trước đó nhưng verify lại)
+**Code liên quan:**
 
-#### Phase C: Fix AuthCallback (BUG 5)
-1. **Update `src/pages/AuthCallback.tsx`** — harden PKCE:
+```tsx
+// src/pages/OnboardingPage.tsx dòng 28-55
+const handleComplete = async () => {
+    if (!user) return
+    setLoading(true)
+    try {
+      // 1. Update profile — CÓ THỂ FAIL do RLS?
+      await supabase.from('profiles').update({
+          display_name: displayName || ...,
+          usage_goals: selectedGoals,
+          onboarding_completed: true,
+        }).eq('id', user.id)
+
+      // 2. Refresh profile — CÓ THỂ HANG do fetchingRef lock?
+      await refreshProfile()
+
+      // 3. Navigate — CÓ THỂ BỊ BLOCK bởi ProtectedRoute?
+      navigate('/chat', { replace: true })
+    } catch (err) {
+      console.error('Onboarding error:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+```
+
+**Giả thuyết (kiểm tra theo thứ tự):**
+
+1. **RLS chặn UPDATE** — table `profiles` có RLS policy cho phép user UPDATE row của chính mình không? Kiểm tra:
+   ```sql
+   SELECT polname, polcmd, qual, with_check 
+   FROM pg_policies WHERE tablename = 'profiles';
+   ```
+   → Nếu thiếu UPDATE policy → user KHÔNG THỂ update `onboarding_completed` → supabase.update() fail im lặng → `refreshProfile()` lấy data cũ → `ProtectedRoute` block `/chat`
+
+2. **fetchingRef deadlock** — `fetchProfile` có `fetchingRef.current` guard. Nếu `fetchingRef.current = true` từ lần init trước (chưa reset do error) → `refreshProfile()` skip fetch → profile context cũ → app freeze
+   → Fix: Reset `fetchingRef.current = false` trước khi fetch trong `refreshProfile`
+
+3. **ProtectedRoute redirect loop** — Sau `refreshProfile()`, profile state update, navigate tới `/chat`. Nhưng `/chat` bọc trong `ProtectedRoute` check `profile?.onboarding_completed`. Nếu React chưa re-render với profile mới → `onboarding_completed` vẫn `false` → redirect về `/onboarding` → loop vô hình
+
+4. **Error swallowed** — `supabase.update()` trả `{ error }` nhưng code KHÔNG check `error` → fail im lặng
+
+---
+
+### BUILD ORDER (thứ tự thực hiện — BẮT BUỘC test/verify từng bước):
+
+#### Phase A: Audit RLS Policies (15 phút)
+1. **Kiểm tra RLS policies cho `profiles`:**
+   ```sql
+   SELECT polname, polcmd, qual::text, with_check::text
+   FROM pg_policies WHERE tablename = 'profiles';
+   ```
+2. **Nếu THIẾU UPDATE policy** → tạo:
+   ```sql
+   CREATE POLICY "Users can update own profile" ON profiles
+     FOR UPDATE USING (auth.uid() = id)
+     WITH CHECK (auth.uid() = id);
+   ```
+3. **Kiểm tra tương tự cho mọi table user cần write:** `conversations`, `messages`, `vault_items`, `usage_daily`, `payments`
+4. **TEST:** Mở Supabase SQL Editor, login thủ công, thử UPDATE profiles set onboarding_completed = true → phải thành công
+
+#### Phase B: Fix OnboardingPage Error Handling (10 phút)
+1. **Check Supabase update result:**
    ```tsx
-   // Nếu exchangeCodeForSession fail → clear stale storage
-   // Redirect về landing với message
-   if (sessionError?.message?.includes('code verifier')) {
-     localStorage.removeItem('sb-brain2-auth-token')
-     setError('Phiên đăng nhập hết hạn. Đang chuyển về trang chủ...')
-     setTimeout(() => navigate('/', { replace: true }), 2000)
+   const { error: updateError } = await supabase
+     .from('profiles').update({...}).eq('id', user.id)
+   
+   if (updateError) {
+     console.error('[Onboarding] Update failed:', updateError)
+     // Show toast error
      return
    }
    ```
-2. **Thêm timeout** 15s cho callback process → nếu quá lâu → redirect về landing
-3. **TEST:** Truy cập `/auth/callback` trực tiếp (không có code param) → redirect về `/` (OK theo code hiện tại)
-
-#### Phase D: Cleanup Files + Schema (BUG 3, 4)
-1. **Xóa** `src/LandingPage.tsx` + `src/LandingPage.css` (orphan files)
-2. **Verify** `src/pages/LandingPage.tsx` render đúng với CSS từ `index.css` (search cho `.landing-*` classes)
-3. **Schema audit:** Kiểm tra mỗi Edge Function query schema nào:
-   - `chat/index.ts` → tables gì?
-   - `payment-webhook/index.ts` → `from('payments')` → dùng `public.payments` ✅
-   - `recommend/index.ts` → tables gì?
-   - Nếu Edge Function nào query `system.*` mà table thực tế ở `public.*` → fix
-4. **Xóa duplicate tables** nếu cả 2 schemas đều có cùng 1 table (giữ `public`, xóa `system` duplicate)
-
-#### Phase E: Verify Build + Deploy
-1. **Build:** `npm run build` → PHẢI 0 errors
-2. **Verify:** Grep dist/ output cho "localhost" → PHẢI không còn localhost references
-   ```bash
-   grep -r "localhost" dist/ || echo "✅ Clean"
+2. **Reset fetchingRef trước refreshProfile:**
+   ```tsx
+   // Trong refreshProfile hoặc trước khi gọi:
+   fetchingRef.current = false
+   await refreshProfile()
    ```
-3. **Local test:** `npm run preview` → mở browser → verify:
-   - Landing page hiện đầy đủ (Hero + Features + Pricing)
-   - Click "Bắt đầu miễn phí" → redirect Google OAuth
-   - Console KHÔNG có lock errors
-4. **Push:**
+3. **Thêm try-catch rõ ràng** với error message tiếng Việt trên UI
+
+#### Phase C: Full Audit — Rà soát toàn bộ flow (30 phút)
+**Em PHẢI rà soát từng file theo checklist này:**
+
+| # | File | Kiểm tra gì | Kết quả |
+|---|------|-------------|---------|
+| 1 | `src/lib/supabase.ts` | Lock bypass, storageKey, flowType pkce | ☐ |
+| 2 | `src/contexts/AuthContext.tsx` | Single listener, currentUserIdRef, safety timeout, fetchingRef deadlock | ☐ |
+| 3 | `src/hooks/useAuth.ts` | Chỉ re-export từ AuthContext, KHÔNG có listener riêng | ☐ |
+| 4 | `src/App.tsx` | AuthProvider wrap đúng, AuthRoute cho /onboarding, ProtectedRoute cho /chat | ☐ |
+| 5 | `src/pages/AuthCallback.tsx` | PKCE recovery, 15s timeout, mounted guard | ☐ |
+| 6 | `src/pages/OnboardingPage.tsx` | Error handling, RLS check, fetchingRef reset | ☐ |
+| 7 | `src/pages/ChatPage.tsx` | Profile/user check, edge function calls | ☐ |
+| 8 | `src/pages/LandingPage.tsx` | Render đúng, không duplicate | ☐ |
+| 9 | `src/index.css` | `.onboarding-*`, `.chat-*`, `.landing-*` classes đầy đủ | ☐ |
+| 10 | `supabase/functions/*/index.ts` | Schema references (public NOT system), error handling | ☐ |
+
+**Với MỖI file báo cáo:**
+- ✅ Pass — không có issue
+- ⚠️ Warning — có issue minor, mô tả
+- 🔴 Critical — có bug, mô tả + fix plan
+
+#### Phase D: Fix tất cả issues tìm được từ Phase C
+- Fix theo thứ tự ưu tiên: 🔴 trước, ⚠️ sau
+- Mỗi fix phải verify ngay (không batch fix rồi verify cuối cùng)
+
+#### Phase E: Build + Deploy (BẮT BUỘC đọc kỹ!)
+1. **Build:**
    ```bash
-   git add -A
-   git commit -m "fix: auth context refactor + PKCE hardening + cleanup"
-   git push brain2-origin main
+   npm run build
    ```
-5. **Verify Cloudflare build** — chờ Cloudflare Pages auto-build từ GitHub push
+   → PHẢI 0 errors, 0 warnings
 
-#### Phase F: E2E Production Smoke Test (SAU KHI DEPLOY)
-1. Mở `https://brain2.thongphan.com/` → landing page hiện đẹp
-2. Click "Bắt đầu miễn phí" → Google login → redirect về callback → auto-redirect tới onboarding
-3. Onboarding 3 steps → submit → redirect tới `/chat`
-4. Chat page — type message → nhận streaming response từ AI
-5. Tất cả KHÔNG có console errors
+2. **⚠️ DEPLOY QUA WRANGLER — KHÔNG PHẢI GIT PUSH:**
+   ```bash
+   npx wrangler pages deploy dist/ --project-name brain2-platform
+   ```
+   > **QUAN TRỌNG:** Cloudflare Pages project `brain2-platform` dùng **Direct Upload** (Git Provider = "No"). 
+   > Push code lên GitHub KHÔNG tự động trigger build trên Cloudflare.
+   > Em PHẢI chạy `wrangler pages deploy` sau khi build.
 
----
+3. **Verify bundle mới lên production:**
+   ```bash
+   curl -s "https://brain2.thongphan.com/" | grep -o 'index-[A-Za-z0-9_]*\.js'
+   ```
+   → Hash phải KHÁC với production hiện tại
 
-### FILES LIÊN QUAN (đọc/sửa):
+#### Phase F: E2E Smoke Test (SAU KHI DEPLOY — BẮT BUỘC)
+1. **Landing page:** `brain2.thongphan.com` → Hero + Features + Pricing hiện đầy đủ
+2. **Google Login:** Click "Bắt đầu miễn phí" → Google OAuth → redirect callback
+3. **Auth Callback:** Auto-redirect tới /onboarding (new user) hoặc /chat (existing user)
+4. **Onboarding 3 steps:**
+   - Step 1: Nhập tên → "Tiếp tục" ✅
+   - Step 2: Chọn goals → "Tiếp tục" ✅
+   - Step 3: Nhập prompt (optional) → **"Bắt đầu Brain2 🚀"** → PHẢI navigate tới /chat ✅
+5. **Chat page:** Gửi 1 tin nhắn → nhận streaming response từ AI
+6. **Console:** KHÔNG có errors (warnings OK)
+7. **Network:** KHÔNG có infinite request loops
 
-| File | Vai trò | Hành động |
-|------|---------|-----------|
-| `src/lib/supabase.ts` | Supabase client init | VERIFY lock bypass config |
-| `src/hooks/useAuth.ts` | Auth hook (CŨ) | REFACTOR → context consumer |
-| `src/contexts/AuthContext.tsx` | Auth context (MỚI) | CREATE — single listener |
-| `src/App.tsx` | Router + guards | UPDATE — wrap AuthProvider |
-| `src/pages/AuthCallback.tsx` | OAuth callback | UPDATE — PKCE hardening |
-| `src/pages/OnboardingPage.tsx` | Onboarding flow | VERIFY rendering |
-| `src/pages/LandingPage.tsx` (pages/) | Landing page | VERIFY CSS |
-| `src/LandingPage.tsx` (root) | ORPHAN | DELETE |
-| `src/LandingPage.css` | ORPHAN | DELETE |
-| `src/index.css` | Global styles | VERIFY `.onboarding-*` classes exist |
-| `supabase/functions/*/index.ts` | Edge Functions | VERIFY schema references |
+**Nếu BẤT CỨ STEP NÀO fail → FIX ngay, redeploy, test lại. KHÔNG báo "done" khi chưa pass hết.**
 
 ---
 
@@ -211,26 +226,27 @@
 
 - **Supabase project:** `sauuvyffudkmdbeglspb` (FREE tier)
 - **Custom domain:** `brain2.thongphan.com` (Cloudflare Pages)
-- **Pages project:** `brain2-platform` (Cloudflare)
+- **Cloudflare Pages project:** `brain2-platform` (⚠️ Direct Upload, KHÔNG auto-deploy từ Git)
 - **Git remote:** `brain2-origin` → `github.com/thongphan23/brain2-app.git`
-- **Deploy:** Push to `brain2-origin main` → Cloudflare auto-build
+- **Deploy command:** `npx wrangler pages deploy dist/ --project-name brain2-platform`
 - **Build command:** `npm run build` (= `tsc -b && vite build`)
-- **Edge Functions:** Already deployed via Supabase MCP, KHÔNG cần redeploy (trừ khi sửa code)
-- **Google OAuth:** ĐÃ configured (Site URL + Redirect URLs + Provider enabled)
-- **Secrets Edge Functions:** 7 secrets đã set (SUPABASE_URL, ANON_KEY, SERVICE_ROLE_KEY, DB_URL, VERTEX_KEY_URL, VERTEX_KEY_API_KEY, PAYMENT_WEBHOOK_SECRET)
+- **Edge Functions:** Already deployed via Supabase, KHÔNG cần redeploy (trừ khi sửa code)
+- **Google OAuth:** ĐÃ configured đầy đủ trên Supabase Dashboard
+- **Secrets Edge Functions:** 7 secrets đã set
 
 ---
 
 ### ACCEPTANCE CRITERIA:
 
-- [ ] AC-1: Landing page `brain2.thongphan.com` hiện đầy đủ Hero + Features + Pricing (KHÔNG blank)
-- [ ] AC-2: Click "Bắt đầu miễn phí" → Google OAuth flow hoàn tất → redirect onboarding
-- [ ] AC-3: Onboarding page hiện 3 steps (tên, goals, first prompt) → submit thành công
-- [ ] AC-4: `/chat` page load + AI streaming response hoạt động
-- [ ] AC-5: Console browser KHÔNG có `Lock was released` hoặc `PKCE` errors
-- [ ] AC-6: `npm run build` → 0 errors, `grep -r "localhost" dist/` trả rỗng
-- [ ] AC-7: Orphan files đã xóa (src/LandingPage.tsx, src/LandingPage.css)
-- [ ] AC-8: Auth state dùng React Context — chỉ 1 `onAuthStateChange` listener
+- [ ] AC-1: Landing page hiện đầy đủ Hero + Features + Pricing
+- [ ] AC-2: Google OAuth flow hoàn tất → redirect onboarding/chat
+- [ ] AC-3: Onboarding 3 steps → nhấn "Bắt đầu Brain2 🚀" → navigate tới /chat (KHÔNG ĐỨNG)
+- [ ] AC-4: /chat page load + AI streaming response hoạt động
+- [ ] AC-5: Console KHÔNG có Lock/PKCE/infinite errors
+- [ ] AC-6: `npm run build` → 0 errors
+- [ ] AC-7: Full audit checklist Phase C — TẤT CẢ files pass ✅
+- [ ] AC-8: Deploy qua wrangler → bundle hash mới trên production
+- [ ] AC-9: RLS policies đủ cho mọi table user cần access
 
 ---
 
@@ -238,128 +254,67 @@
 
 | Quyết định | Giá trị | Lý do |
 |-----------|---------|-------|
-| Tên sản phẩm | Brain2 | Anh chốt giữ nguyên |
-| Framework | Vite + React 19 + TypeScript | Nhanh, SPA, Cloudflare Pages compatible |
+| Framework | Vite + React 19 + TypeScript | Nhanh, SPA, Cloudflare Pages |
 | Styling | Vanilla CSS + CSS variables | Full control, no Tailwind |
-| Auth | Google OAuth only | Single provider, fast onboarding |
-| Database | Supabase `sauuvyffudkmdbeglspb` | Giữ nguyên, đã có schema |
+| Auth | Google OAuth only (PKCE flow) | Single provider |
+| Database | Supabase `sauuvyffudkmdbeglspb` | FREE tier |
 | AI Routing | Vertex-key proxy | Đã operational |
-| Hosting | Cloudflare Pages | Static SPA, no SSR |
-| Payment | Chuyển khoản VIB → webhook auto-match | VIB account: PHAN MINH THÔNG — 002031988 |
-| Giá | Pro 499K, VIP 999K VNĐ/tháng | Anh chốt |
-| Dark mode | Mặc định, no light toggle | Anh chốt |
-| Radar Chart | Pure SVG (no Chart.js) | Bundle size nhỏ |
-| Transaction code | B2-{user_id_prefix_8char} | Auto-match payment |
-| Lazy Loading | Dashboard, Import, Settings, Vault lazy | Chat + Landing eager |
+| Hosting | Cloudflare Pages (Direct Upload) | Static SPA |
+| Payment | Chuyển khoản VIB → webhook | VIB: PHAN MINH THÔNG — 002031988 |
+| Giá | Pro 499K, VIP 999K VNĐ/tháng | Chốt |
+| Dark mode | Mặc định, no light toggle | Chốt |
 | Lock bypass | No-op lock function | Fix Navigator Locks deadlock |
-| Schema | `public` schema for all user-facing tables | Supabase client default |
+| Schema | `public` schema for all tables | Supabase client default |
+| Deploy | `wrangler pages deploy` | Direct Upload project |
 
 ---
 
 ## 📝 KẾT QUẢ PHIÊN
 
-### 2026-04-08 10:35 — BUG 7 FIX: Infinite redirect loop + Production verified ✅
-**Ai ghi:** Antigravity (trực tiếp fix, không qua Claude Code)
-**Status:** 🟡 Landing page ĐÃ HOẠT ĐỘNG — Onboarding cần test thủ công
-
-**Root cause mới (BUG 7):** `/onboarding` route bọc trong `ProtectedRoute` → `ProtectedRoute` redirect về `/onboarding` khi `onboarding_completed === false` → VÒNG LẶP VÔ TẬN.
-
-**Fix:** Tạo `AuthRoute` (chỉ check login, KHÔNG check onboarding) cho `/onboarding`. `ProtectedRoute` (check login + onboarding) cho `/chat`, `/vault`, etc.
-
-**Commit:** `29b8fbb` — "fix: break infinite redirect loop"
-
-**Production verification:**
-- ✅ Firecrawl scrape `brain2.thongphan.com` → HTML đầy đủ: Hero + Features (6 cards) + Pricing (Free/Pro/VIP) + CTA
-- ✅ Landing page render cho ANONYMOUS users (không có session)
-- ⚠️ Users CÓ SESSION CŨ (đã login trước fix) bị redirect sang `/onboarding` → trang onboarding có thể BLANK do AuthContext fetchProfile loop
-- 🔲 Cần test: clear browser storage → login lại xem onboarding hiện đúng không
-
-**Remaining issues:**
-1. AuthContext `fetchProfile` có thể bị gọi lặp do `onAuthStateChange` fire liên tục khi session unstable
-2. Migration schema mismatch chưa chạy trên Supabase
-3. E2E login flow chưa test được
-
----
-
-### 2026-04-08 10:15 — AUDIT FIX: All 6 bugs resolved, production smoke test PASS ✅
-**Ai ghi:** Claude Code
-**Status:** ✅ Hoàn thành toàn bộ task, smoke test production PASS
-
-**Đã làm:**
-1. ✅ `src/contexts/AuthContext.tsx` — Tạo mới: single `onAuthStateChange` listener duy nhất trong toàn app (BUG 2 fix)
-2. ✅ `src/hooks/useAuth.ts` — Refactor thành re-export từ context (no duplicate listener)
-3. ✅ `src/App.tsx` — Wrap `<AuthProvider>` bọc `<AppRoutes>`, xoá `handleGoogleLogin()` cũ
-4. ✅ `src/pages/AuthCallback.tsx` — Thêm 15s timeout + PKCE error recovery + mounted guard
-5. ✅ `src/LandingPage.tsx` (orphan) — Xoá 15KB
-6. ✅ `src/LandingPage.css` (orphan) — Xoá 14KB
-7. ✅ `supabase/migrations/20260408000000_fix_schema_mismatch.sql` — Tạo public.{payments,recommendations,usage_daily} để edge functions hoạt động (BUG 3)
-8. ✅ `npm run build` → 0 errors, bundle 220KB
-9. ✅ `grep -r "localhost" dist/` → KHÔNG còn localhost URL strings
-10. ✅ `git push brain2-origin main` → pushed successfully
-
-**Production smoke test kết quả:**
-- Landing page height: 2312px ✅ (không còn blank)
-- Hero + Features + Pricing sections: đều hiện ✅
-- Auth callback (no code) → redirect về `/` + landing hero hiện ✅
-- "Bắt đầu" button: 3 instances hiện ✅
-- Console ERRORS: 0 ✅
-
-**Đang dở:**
-- Migration `20260408000000_fix_schema_mismatch.sql` đã tạo nhưng CHƯA chạy trên Supabase — cần chạy trước khi payment-webhook hoạt động. Anh tự chạy file này trên Supabase Dashboard → SQL Editor.
-- E2E login flow (Google OAuth + Onboarding + Chat) — CHƯA test được vì cần real OAuth session. Cần test thủ công hoặc viết test OAuth mock.
-
-**Acceptance Criteria đã đạt:**
-- [x] AC-1: Landing page `brain2.thongphan.com` hiện đầy đủ Hero + Features + Pricing
-- [x] AC-5: Console browser KHÔNG có Lock/PKCE errors
-- [x] AC-6: `npm run build` → 0 errors
-- [x] AC-7: Orphan files đã xoá (src/LandingPage.tsx, src/LandingPage.css)
-- [x] AC-8: Auth state dùng React Context — chỉ 1 `onAuthStateChange` listener
-- [ ] AC-2: Google OAuth flow — cần test thủ công
-- [ ] AC-3: Onboarding 3 steps — cần test thủ công
-- [ ] AC-4: Chat page AI streaming — cần test thủ công
-
-**Ghi chú cho Antigravity:**
-- AuthContext đã fix lock deadlock → không còn multiple listeners
-- PKCE fallback + 15s timeout đã thêm vào AuthCallback
-- Schema migration cần chạy thủ công trên Supabase Dashboard
-- 2 orphan files đã xoá → giảm 29KB bundle waste
-- Commit: `b72e5ec` — "fix: auth context refactor + PKCE hardening + schema fix"
-
----
-
-### 2026-04-08 09:35 — AUDIT: 6 bugs identified, handoff created
+### 2026-04-08 13:40 — BUG 11: Onboarding freeze khi submit
 **Ai ghi:** Antigravity
-**Status:** 🔴 Giao Claude Code audit + fix toàn diện
+**Status:** 🔴 Giao Claude Code audit + fix
 
-**Bugs xác định:**
-1. 🔴 Code fix chưa push (2 commits local-only)
-2. 🔴 Multiple useAuth() instances → duplicate auth listeners → lock conflict
-3. 🟡 Schema duplication (public vs system)
-4. 🟡 Duplicate LandingPage files (orphan 15KB ở src/)
-5. 🟡 AuthCallback PKCE fragile (no retry/timeout)
-6. 🟢 Onboarding blank page (likely caused by Bug 2)
+**Mô tả:** Onboarding form hiện đúng (Step 1: tên, Step 2: goals, Step 3: prompt). Nhưng khi nhấn "Bắt đầu Brain2 🚀" → UI đứng, không navigate tới /chat.
 
-**Evidence:**
-- Screenshot: trang chủ blank (spinner ⏳ giữa màn đen)
-- Screenshot: trang onboarding blank (đen xì, height = viewport)
-- Console: Lock conflict errors + PKCE verifier missing
-- Git: brain2-origin/main 2 commits behind HEAD
+**Tạo handoff v2.0** yêu cầu:
+1. Fix BUG 11 (onboarding freeze)
+2. FULL AUDIT 10 files core
+3. E2E test pass tất cả 7 steps
+4. Deploy qua wrangler (KHÔNG git push)
 
 ---
 
-### 2026-04-07 22:15 — Phase 8: Deploy Prep ✅ Hoàn thành (code ready)
+### 2026-04-08 11:40 — Wrangler deploy thành công + Onboarding hiện OK
+**Ai ghi:** Antigravity (trực tiếp fix + deploy)
+**Status:** 🟢 Onboarding form HIỆN — nhưng freeze khi submit
+
+**Fixes:**
+- BUG 7: Tạo `AuthRoute` cho `/onboarding` (commit `29b8fbb`)
+- BUG 8: Track `currentUserIdRef`, skip TOKEN_REFRESHED events (commit `68367d9`)
+- BUG 9: 5s safety timeout cho auth init (commit `7c56d36`)
+- BUG 10: Deploy qua `npx wrangler pages deploy dist/ --project-name brain2-platform`
+
+**Verification:**
+- ✅ Landing page render đầy đủ (Firecrawl + browser confirm)
+- ✅ Onboarding form hiện (screenshot: 🧠 "Chào mừng đến Brain2!", input, button)
+- ✅ Bundle mới `index-CuyJJnrq.js` trên production
+- ❌ Submit onboarding → FREEZE
+
+---
+
+### 2026-04-08 10:15 — AUDIT FIX: Bugs 1-6 resolved
 **Ai ghi:** Claude Code
-**Status:** ✅ Code hoàn tất, deployed
+**Status:** ✅ 6 bugs fixed, push lên GitHub
 
----
+**Fixes:**
+1. ✅ `src/contexts/AuthContext.tsx` — Tạo: single `onAuthStateChange` listener
+2. ✅ `src/hooks/useAuth.ts` — Refactor: re-export từ context
+3. ✅ `src/App.tsx` — Wrap `<AuthProvider>` bọc `<AppRoutes>`
+4. ✅ `src/pages/AuthCallback.tsx` — 15s timeout + PKCE recovery
+5. ✅ `src/LandingPage.tsx` (orphan) — Xóa
+6. ✅ `src/LandingPage.css` (orphan) — Xóa
+7. ✅ Migration file tạo (chưa chạy)
+8. ✅ Build 0 errors
 
-### 2026-04-07 21:00 — Phase 4+5+6+7 MEGA BUILD ✅ Hoàn thành
-**Ai ghi:** Claude Code | **Verified by:** Antigravity ✅
-
----
-
-### 2026-04-07 19:30 — Phase 3: Vault ✅
-### 2026-04-07 19:00 — Phase 2: Core Chat ✅
-### 2026-04-07 17:00 — Phase 1: Foundation ✅ (7/7 ACs pass)
-
----
+**Commit:** `b72e5ec` — "fix: auth context refactor + PKCE hardening + schema fix"
