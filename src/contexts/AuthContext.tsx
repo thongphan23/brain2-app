@@ -111,6 +111,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     init()
 
+    // Safety timeout: if init hangs (getSession stuck with no-op lock),
+    // force loading=false after 5s so app doesn't show infinite spinner
+    const safetyTimeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('[AuthContext] Safety timeout: forcing loading=false after 5s')
+        setLoading(false)
+      }
+    }, 5000)
+
     // Single onAuthStateChange listener — cleaned up when component unmounts
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
@@ -145,6 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false
+      clearTimeout(safetyTimeout)
       subscription.unsubscribe()
     }
   }, [fetchProfile, createProfileIfNeeded])
