@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { MessageBubble } from './MessageBubble'
 import { ChatInput } from './ChatInput'
 import { ModeSelector, DEFAULT_MODES } from './ModeSelector'
@@ -9,6 +10,7 @@ import { useConversations } from '../../hooks/useConversations'
 import { useVault } from '../../hooks/useVault'
 import { useTier } from '../../hooks/useTier'
 import { useNetworkState } from '../../hooks/useNetworkState'
+import { useChatHistory } from '../../hooks/useChatHistory'
 import { useToast } from '../shared/Toast'
 import type { TierType, CognitiveTool } from '../../lib/types'
 import type { Profile } from '../../lib/types'
@@ -17,6 +19,7 @@ interface ChatInterfaceProps {
   userId: string
   profile: Profile | null
   tools: CognitiveTool[]
+  activeConversationId?: string | null
   onConversationChange?: (id: string | null, mode: string) => void
   onConversationsChange?: () => void
   initialPrompt?: string
@@ -33,10 +36,12 @@ export function ChatInterface({
   userId,
   profile,
   tools,
+  activeConversationId,
   onConversationChange,
   onConversationsChange,
   initialPrompt,
 }: ChatInterfaceProps) {
+  const { messages: historyMessages, loadMessages, clearMessages } = useChatHistory()
   const [input, setInput] = useState('')
   const [activeMode, setActiveMode] = useState('chat_free')
   const [selectedModel, setSelectedModel] = useState('free/qwen3-235b')
@@ -68,6 +73,15 @@ export function ChatInterface({
   const { createNote, refreshNotes } = useVault(userId)
   const { usageToday, limits, checkCanSendMessage, refreshUsage } = useTier(userId)
   const isOffline = useNetworkState()
+  const navigate = useNavigate()
+
+  const userTier: TierType = profile?.tier || 'free'
+
+  // Usage threshold: show upgrade banner when at 80%+
+  const usagePct = limits.messages_per_day > 0
+    ? (usageToday.messages_used / limits.messages_per_day) * 100
+    : 0
+  const showUpgradeBanner = !isOffline && (userTier === 'free' && usagePct >= 80)
 
   // IMPLEMENT-3: Toast on reconnect
   const prevOffline = useRef(false)
@@ -83,14 +97,24 @@ export function ChatInterface({
     refreshUsage()
   }, [refreshUsage])
 
-  const userTier: TierType = profile?.tier || 'free'
-
-  // Sync conversation selection
+  // Sync conversation selection + load history when sidebar selects a conversation
   useEffect(() => {
     if (activeId && activeId !== conversationId) {
       setConversationId(activeId)
     }
   }, [activeId, conversationId, setConversationId])
+
+  // Load conversation history from sidebar selection
+  const prevActiveRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (activeConversationId && activeConversationId !== prevActiveRef.current) {
+      prevActiveRef.current = activeConversationId
+      loadMessages(activeConversationId)
+    } else if (!activeConversationId) {
+      prevActiveRef.current = null
+      clearMessages()
+    }
+  }, [activeConversationId, loadMessages, clearMessages])
 
   // Auto-scroll
   useEffect(() => {
@@ -207,7 +231,7 @@ export function ChatInterface({
       }))
     : DEFAULT_MODES
 
-  const hasMessages = messages.length > 0
+  const hasMessages = messages.length > 0 || historyMessages.length > 0
 
   return (
     <div className="chat-interface">
@@ -232,6 +256,19 @@ export function ChatInterface({
         {isOffline && (
           <div className="chat-offline-banner" role="alert">
             ⚠️ Đã mất kết nối. Chat sẽ tiếp tục khi có mạng.
+          </div>
+        )}
+        {showUpgradeBanner && (
+          <div className="chat-upgrade-banner" role="alert">
+            <div className="upgrade-banner-content">
+              <span>💎 Bạn đã dùng <strong>{Math.round(usagePct)}%</strong> lượt hôm nay.</span>
+              <button
+                className="upgrade-banner-btn"
+                onClick={() => navigate('/settings')}
+              >
+                🚀 Nâng cấp Pro
+              </button>
+            </div>
           </div>
         )}
         {!hasMessages && !isStreaming ? (
@@ -268,6 +305,16 @@ export function ChatInterface({
             role="log"
             aria-label="Tin nhắn chat Brain2"
           >
+            {/* History messages from DB */}
+            {historyMessages.map((msg) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                isGrouped={false}
+                toolName={activeModes.find(m => m.slug === activeMode)?.name || 'Brain2'}
+              />
+            ))}
+            {/* Live / streaming messages */}
             {messages.map((msg, idx) => {
               const prevMsg = idx > 0 ? messages[idx - 1] : null
               const isGrouped = prevMsg?.role === msg.role

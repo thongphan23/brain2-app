@@ -88,6 +88,7 @@ export function ChatPage() {
         userId={user.id}
         profile={profile}
         tools={tools}
+        activeConversationId={activeConvId}
         onConversationChange={handleConversationChange}
         onConversationsChange={loadConversations}
         initialPrompt={initialPrompt}
