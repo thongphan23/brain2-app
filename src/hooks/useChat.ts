@@ -30,7 +30,7 @@ interface UseChatReturn {
 export function useChat(userId: string | undefined): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
-  const [currentModel, setCurrentModel] = useState('gemini-2.5-flash')
+  const [currentModel, setCurrentModel] = useState('free/qwen3-235b')
   const [currentMode, setCurrentMode] = useState('chat_free')
   const [error, setError] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -83,13 +83,24 @@ export function useChat(userId: string | undefined): UseChatReturn {
       const contentType = res.headers.get('content-type') || ''
       if (!contentType.includes('text/event-stream')) {
         const errData = await res.json()
+        let errMsg = 'Có lỗi xảy ra. Vui lòng thử lại.'
         if (res.status === 429) {
-          setError(errData.message || 'Đã đạt giới hạn sử dụng. Nâng cấp Pro để có thêm tin nhắn.')
+          errMsg = errData.message || 'Đã đạt giới hạn sử dụng. Nâng cấp Pro để có thêm tin nhắn.'
         } else {
-          setError(errData.message || 'Có lỗi xảy ra. Vui lòng thử lại.')
+          errMsg = errData.message || 'Dịch vụ AI tạm thời không khả dụng. Vui lòng thử lại sau.'
         }
-        // Remove optimistic user message on error
-        setMessages(prev => prev.filter(m => m.id !== userMessage.id))
+        setError(errMsg)
+        // Replace user message with error bubble — don't delete it
+        setMessages(prev => {
+          const withoutUser = prev.filter(m => m.id !== userMessage.id)
+          return [...withoutUser, {
+            id: crypto.randomUUID(),
+            role: 'assistant' as const,
+            content: `⚠️ ${errMsg}`,
+            conversation_id: existingConvId || conversationId || '',
+            created_at: new Date().toISOString(),
+          }]
+        })
         setIsStreaming(false)
         return
       }
@@ -144,8 +155,19 @@ export function useChat(userId: string | undefined): UseChatReturn {
 
     } catch (err) {
       console.error('Chat error:', err)
-      setError('Có lỗi xảy ra. Vui lòng thử lại.')
-      setMessages(prev => prev.filter(m => m.id !== userMessage.id))
+      const errMsg = 'Có lỗi xảy ra. Vui lòng thử lại.'
+      setError(errMsg)
+      // Show error as AI bubble — keep user message visible
+      setMessages(prev => {
+        const withoutUser = prev.filter(m => m.id !== userMessage.id)
+        return [...withoutUser, {
+          id: crypto.randomUUID(),
+          role: 'assistant' as const,
+          content: `⚠️ ${errMsg}`,
+          conversation_id: existingConvId || conversationId || '',
+          created_at: new Date().toISOString(),
+        }]
+      })
     } finally {
       setIsStreaming(false)
     }

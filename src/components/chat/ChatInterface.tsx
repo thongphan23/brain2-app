@@ -38,7 +38,7 @@ export function ChatInterface({
 }: ChatInterfaceProps) {
   const [input, setInput] = useState('')
   const [activeMode, setActiveMode] = useState('chat_free')
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash')
+  const [selectedModel, setSelectedModel] = useState('free/qwen3-235b')
   const [inputKey, setInputKey] = useState(0)
   const [savingNote, setSavingNote] = useState(false)
   const [autoSent, setAutoSent] = useState(false)

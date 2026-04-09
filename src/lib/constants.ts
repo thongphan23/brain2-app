@@ -17,7 +17,7 @@ export const TIER_CONFIGS: TierConfig[] = [
   {
     tier: 'free',
     label: 'Free',
-    messages_per_day: 20,
+    messages_per_day: 30,
     notes_limit: 50,
     monthly_price_vnd: 0,
     features: [
@@ -83,10 +83,15 @@ export interface ModelInfo {
 }
 
 export const AI_MODELS: ModelInfo[] = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', icon: '⚡', tier: 'free', desc: 'Nhanh, thông minh — mặc định' },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'Google', icon: '💎', tier: 'free', desc: 'Suy luận sâu, phức tạp' },
-  { id: 'prx/claude-haiku-4-5', name: 'Claude Haiku 4.5', provider: 'Anthropic', icon: '🌸', tier: 'free', desc: 'Nhanh, tiết kiệm token' },
+  // FREE models — primary for free tier
+  { id: 'free/qwen3-235b', name: 'Qwen3 235B', provider: 'Free', icon: '🆓', tier: 'free', desc: 'Miễn phí — 131K context, mặc định' },
+  { id: 'free/Claude-v3.2', name: 'Claude V3.2', provider: 'Free', icon: '🆓', tier: 'free', desc: 'Miễn phí — suy luận mạnh' },
+  { id: 'free/kimi-k2', name: 'Kimi K2', provider: 'Free', icon: '🆓', tier: 'free', desc: 'Miễn phí — 131K context' },
   { id: 'Claude-r1', name: 'Claude R1', provider: 'Claude', icon: '🔮', tier: 'free', desc: 'Suy luận mạnh, miễn phí' },
+  // PAID models
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'Google', icon: '⚡', tier: 'pro', desc: 'Nhanh, thông minh' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'Google', icon: '💎', tier: 'pro', desc: 'Suy luận sâu, phức tạp' },
+  { id: 'prx/claude-haiku-4-5', name: 'Claude Haiku 4.5', provider: 'Anthropic', icon: '🌸', tier: 'pro', desc: 'Nhanh, tiết kiệm token' },
   { id: 'prx/claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'Anthropic', icon: '🎭', tier: 'pro', desc: 'Viết tốt, sáng tạo' },
   { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', icon: '🟢', tier: 'pro', desc: 'Đa năng, mạnh mẽ' },
   { id: 'prx/claude-opus-4-6', name: 'Claude Opus 4.6', provider: 'Anthropic', icon: '👑', tier: 'vip', desc: 'Mạnh nhất, suy luận cực sâu' },

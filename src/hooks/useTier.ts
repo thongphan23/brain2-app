@@ -42,8 +42,8 @@ export function useTier(userId: string | undefined): UseTierReturn {
   const isUpgradeAvailable = tier === 'free'
 
   const getAllowedModels = (t: TierType): string[] => {
-    const free = ['gemini-2.5-flash', 'prx/claude-haiku-4-5', 'Claude-r1']
-    const pro = [...free, 'gemini-2.5-pro', 'prx/claude-sonnet-4-6', 'gpt-4o']
+    const free = ['free/qwen3-235b', 'free/Claude-v3.2', 'free/kimi-k2', 'Claude-r1']
+    const pro = [...free, 'gemini-2.5-flash', 'gemini-2.5-pro', 'prx/claude-haiku-4-5', 'prx/claude-sonnet-4-6', 'gpt-4o']
     if (t === 'pro') return pro
     if (t === 'vip') return [...pro, 'prx/claude-opus-4-6']
     return free

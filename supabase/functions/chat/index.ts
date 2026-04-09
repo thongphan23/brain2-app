@@ -55,17 +55,25 @@ You DO NOT replace thinking. You AMPLIFY thinking.
 === TOOL-SPECIFIC INSTRUCTIONS ===
 `;
 
-const MODELS: Record<string, { vertexId: string; name: string; maxTokens: number; costPer1kInput: number; costPer1kOutput: number; fallback?: string }> = {
-  "gemini-2.5-flash": { vertexId: "gemini-2.5-flash-chat", name: "Gemini 2.5 Flash", maxTokens: 8192, costPer1kInput: 0.00015, costPer1kOutput: 0.0006 },
-  "gemini-2.5-pro": { vertexId: "gemini-2.5-pro-chat", name: "Gemini 2.5 Pro", maxTokens: 8192, costPer1kInput: 0.00125, costPer1kOutput: 0.01 },
-  "gemini-3-flash": { vertexId: "gemini-3-flash-preview-chat", name: "Gemini 3 Flash", maxTokens: 8192, costPer1kInput: 0.0002, costPer1kOutput: 0.0008 },
-  "gemini-3-pro": { vertexId: "gemini-3-pro-preview-chat", name: "Gemini 3 Pro", maxTokens: 8192, costPer1kInput: 0.002, costPer1kOutput: 0.015 },
-  "prx/claude-sonnet-4-6": { vertexId: "prx/claude-sonnet-4-6", name: "Claude Sonnet 4.6", maxTokens: 4096, costPer1kInput: 0.003, costPer1kOutput: 0.015, fallback: "omega/claude-sonnet-4-6" },
-  "prx/claude-haiku-4-5": { vertexId: "prx/claude-haiku-4-5", name: "Claude Haiku 4.5", maxTokens: 4096, costPer1kInput: 0.001, costPer1kOutput: 0.005, fallback: "omega/claude-haiku-4-5" },
-  "prx/claude-opus-4-6": { vertexId: "prx/claude-opus-4-6", name: "Claude Opus 4.6", maxTokens: 4096, costPer1kInput: 0.005, costPer1kOutput: 0.025, fallback: "omega/claude-opus-4-6" },
-  "gpt-4o": { vertexId: "pro/gpt-4o", name: "GPT-4o", maxTokens: 4096, costPer1kInput: 0.0025, costPer1kOutput: 0.01 },
-  "gpt-5.2": { vertexId: "pro/gpt-5.2", name: "GPT-5.2", maxTokens: 8192, costPer1kInput: 0.005, costPer1kOutput: 0.025 },
-  "grok-4": { vertexId: "xai/grok-4", name: "Grok 4", maxTokens: 8192, costPer1kInput: 0.005, costPer1kOutput: 0.025 },
+const MODELS: Record<string, { vertexId: string; name: string; maxTokens: number; costPer1kInput: number; costPer1kOutput: number; fallbacks: string[] }> = {
+  // FREE models — PRIMARY for free tier
+  "free/qwen3-235b": { vertexId: "free/qwen3-235b", name: "Qwen3 235B (Free)", maxTokens: 8192, costPer1kInput: 0, costPer1kOutput: 0, fallbacks: ["free/Claude-v3.2", "free/kimi-k2", "free/qwen3-max"] },
+  "free/Claude-v3.2": { vertexId: "free/Claude-v3.2", name: "Claude V3.2 (Free)", maxTokens: 8192, costPer1kInput: 0, costPer1kOutput: 0, fallbacks: ["free/qwen3-235b", "free/kimi-k2"] },
+  "free/kimi-k2": { vertexId: "free/kimi-k2", name: "Kimi K2 (Free)", maxTokens: 8192, costPer1kInput: 0, costPer1kOutput: 0, fallbacks: ["free/qwen3-235b", "free/Claude-v3.2"] },
+  "free/qwen3-max": { vertexId: "free/qwen3-max", name: "Qwen3 Max (Free)", maxTokens: 8192, costPer1kInput: 0, costPer1kOutput: 0, fallbacks: ["free/qwen3-235b", "free/Claude-v3.2"] },
+  // PAID models — need balance, fallback to free if fail
+  "gemini-2.5-flash": { vertexId: "gemini-2.5-flash-chat", name: "Gemini 2.5 Flash", maxTokens: 8192, costPer1kInput: 0.00015, costPer1kOutput: 0.0006, fallbacks: ["free/qwen3-235b", "free/Claude-v3.2"] },
+  "gemini-2.5-pro": { vertexId: "gemini-2.5-pro-chat", name: "Gemini 2.5 Pro", maxTokens: 8192, costPer1kInput: 0.00125, costPer1kOutput: 0.01, fallbacks: ["gemini-2.5-flash", "free/qwen3-235b"] },
+  "gemini-3-flash": { vertexId: "gemini-3-flash-preview-chat", name: "Gemini 3 Flash", maxTokens: 8192, costPer1kInput: 0.0002, costPer1kOutput: 0.0008, fallbacks: ["gemini-2.5-flash", "free/qwen3-235b"] },
+  "gemini-3-pro": { vertexId: "gemini-3-pro-preview-chat", name: "Gemini 3 Pro", maxTokens: 8192, costPer1kInput: 0.002, costPer1kOutput: 0.015, fallbacks: ["gemini-2.5-flash", "free/qwen3-235b"] },
+  "prx/claude-sonnet-4-6": { vertexId: "prx/claude-sonnet-4-6", name: "Claude Sonnet 4.6", maxTokens: 4096, costPer1kInput: 0.003, costPer1kOutput: 0.015, fallbacks: ["free/qwen3-235b"] },
+  "prx/claude-haiku-4-5": { vertexId: "prx/claude-haiku-4-5", name: "Claude Haiku 4.5", maxTokens: 4096, costPer1kInput: 0.001, costPer1kOutput: 0.005, fallbacks: ["free/qwen3-235b"] },
+  "prx/claude-opus-4-6": { vertexId: "prx/claude-opus-4-6", name: "Claude Opus 4.6", maxTokens: 4096, costPer1kInput: 0.005, costPer1kOutput: 0.025, fallbacks: ["free/qwen3-235b"] },
+  "gpt-4o": { vertexId: "pro/gpt-4o", name: "GPT-4o", maxTokens: 4096, costPer1kInput: 0.0025, costPer1kOutput: 0.01, fallbacks: ["free/qwen3-235b"] },
+  "gpt-5.2": { vertexId: "pro/gpt-5.2", name: "GPT-5.2", maxTokens: 8192, costPer1kInput: 0.005, costPer1kOutput: 0.025, fallbacks: ["free/qwen3-235b"] },
+  "grok-4": { vertexId: "xai/grok-4", name: "Grok 4", maxTokens: 8192, costPer1kInput: 0.005, costPer1kOutput: 0.025, fallbacks: ["free/qwen3-235b"] },
+  // Alias for backwards compatibility
+  "Claude-r1": { vertexId: "free/Claude-r1", name: "Claude R1 (Free)", maxTokens: 8192, costPer1kInput: 0, costPer1kOutput: 0, fallbacks: ["free/qwen3-235b"] },
 };
 
 interface ChatRequest {
@@ -80,8 +88,8 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "GET") {
     return new Response(JSON.stringify({
-      status: "ok", version: 22,
-      features: ["global-rules", "vault-context", "streaming", "user-id-fix"],
+      status: "ok", version: 28,
+      features: ["global-rules", "vault-context", "streaming", "user-id-fix", "multi-model-fallback"],
       models: Object.entries(MODELS).map(([id, m]) => ({ id, name: m.name })),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
@@ -105,7 +113,7 @@ Deno.serve(async (req: Request) => {
 
     const body: ChatRequest = await req.json();
     const { tool_slug, message, conversation_id } = body;
-    let modelKey = body.model && MODELS[body.model] ? body.model : "gemini-2.5-flash";
+    let modelKey = body.model && MODELS[body.model] ? body.model : "free/qwen3-235b";
 
     if (!tool_slug || !message) {
       return new Response(JSON.stringify({ error: "tool_slug and message required" }), {
@@ -128,7 +136,7 @@ Deno.serve(async (req: Request) => {
             tier: rateCheck.tier,
           }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
-        if (rateCheck.allowed_models && !rateCheck.allowed_models.includes(modelKey)) modelKey = "gemini-2.5-flash";
+        if (rateCheck.allowed_models && !rateCheck.allowed_models.includes(modelKey)) modelKey = "free/qwen3-235b";
       }
     } catch {}
 
@@ -191,34 +199,38 @@ Deno.serve(async (req: Request) => {
       model_used: modelKey,
     });
 
-    // AI call
-    const modelConfig = MODELS[modelKey];
-    const callAI = async (vertexModelId: string) => {
-      return fetch(`${VERTEX_KEY_URL}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${VERTEX_KEY_API_KEY}` },
-        body: JSON.stringify({ model: vertexModelId, messages, stream: true, max_tokens: modelConfig.maxTokens, temperature: 0.7 }),
-      });
+    // AI call — try primary model, then each fallback in order
+    const callWithFallback = async (primaryKey: string, fallbacks: string[]): Promise<{ response: Response; usedModel: string } | null> => {
+      const allModelKeys = [primaryKey, ...fallbacks].filter(k => MODELS[k])
+      for (const mk of allModelKeys) {
+        const mc = MODELS[mk]
+        try {
+          const res = await fetch(`${VERTEX_KEY_URL}/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${VERTEX_KEY_API_KEY}` },
+            body: JSON.stringify({ model: mc.vertexId, messages, stream: true, max_tokens: mc.maxTokens, temperature: 0.7 }),
+          });
+          if (res.ok) return { response: res, usedModel: mk }
+          // 402 (balance), 406 (upstream), 503 (service) → try next
+          if (res.status === 402 || res.status === 406 || res.status === 503) continue
+          // Other errors → stop (not retriable)
+          return { response: res, usedModel: mk }
+        } catch { continue }
+      }
+      return null // All failed
     };
 
-    let aiResponse = await callAI(modelConfig.vertexId);
-    if (!aiResponse.ok && modelConfig.fallback) {
-      aiResponse = await callAI(modelConfig.fallback);
-    }
+    const modelConfig = MODELS[modelKey] || MODELS["free/qwen3-235b"]
+    const result = await callWithFallback(modelKey, modelConfig.fallbacks)
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      let userMessage = "Dich vu AI tam thoi khong kha dung. Vui long thu lai sau.";
-      try {
-        const errJson = JSON.parse(errText);
-        if (errJson.error?.message?.includes("Insufficient balance")) {
-          userMessage = "He thong AI dang bao tri. Vui long thu lai sau it phut.";
-        }
-      } catch {}
-      return new Response(JSON.stringify({ error: "service_unavailable", message: userMessage }), {
+    if (!result) {
+      return new Response(JSON.stringify({ error: "service_unavailable", message: "Tất cả models AI đều tạm thời không khả dụng. Vui lòng thử lại sau vài phút." }), {
         status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const aiResponse = result.response
+    const usedModel = result.usedModel
 
     // Stream
     const reader = aiResponse.body!.getReader();
@@ -249,7 +261,8 @@ Deno.serve(async (req: Request) => {
           if (fullText) {
             const inputTokens = Math.ceil(message.length / 4);
             const outputTokens = Math.ceil(fullText.length / 4);
-            const estimatedCost = (inputTokens / 1000) * modelConfig.costPer1kInput + (outputTokens / 1000) * modelConfig.costPer1kOutput;
+            const mc = MODELS[usedModel];
+            const estimatedCost = (inputTokens / 1000) * (mc?.costPer1kInput || 0) + (outputTokens / 1000) * (mc?.costPer1kOutput || 0);
 
             // FIX BUG-C1: Save assistant msg WITH user_id
             await supabase.from("messages").insert({
@@ -259,8 +272,8 @@ Deno.serve(async (req: Request) => {
               content: fullText,
               input_tokens: inputTokens,
               output_tokens: outputTokens,
-              model_used: modelKey,
-              metadata: { model: modelKey, vertex_model: modelConfig.vertexId, estimated_cost: estimatedCost },
+              model_used: usedModel,
+              metadata: { model: usedModel, vertex_model: mc?.vertexId || usedModel, estimated_cost: estimatedCost },
             });
             // FIX BUG-C4: update last_message_at
             await supabase.from("conversations").update({
