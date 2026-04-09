@@ -1,4 +1,4 @@
-# 📋 Sổ Bàn Giao v4.2 — Brain2 Platform: CI/CD & UX/DX Mastery
+# 📋 Sổ Bàn Giao v4.3 — Brain2 Platform: Advanced Dashboard & Offline UX
 
 > File này là kênh giao tiếp 2 chiều giữa Antigravity (PM) và Claude Code (Builder).
 > ⚠️ File này là NGUỒN SỰ THẬT DUY NHẤT sau khi /clear — đọc KỸ trước khi làm.
@@ -8,78 +8,66 @@
 
 ## 🗺️ TRẠNG THÁI HIỆN TẠI
 
-**Cập nhật lần cuối:** Chủ động ghi đè bởi Antigravity (2026-04-09)
-**Phiên bản:** v4.2 — CI/CD, PWA & UX Mastery ✅
-**Tình trạng chung:** ✅ COMPLETE — Tất cả 3 tasks (PWA + Retry + A11y) đã xong, deploy live, commit pushed. 
+**Cập nhật lần cuối:** 2026-04-09
+**Phiên bản:** v4.3 — Advanced Dashboard & Offline UX ✅ HOÀN THÀNH
+**Tình trạng chung:** 🟢 ỔN ĐỊNH. Dashboard Recharts, Offline UX, & Glassmorphism đã xong trong v4.3.
 
 ### Kết quả các phiên trước:
-- ✅ Xong Fallback Chain nhiều AI Models cho Chat (Nếu model 1 chết -> thử model 2)
-- ✅ Các component đã xử lý UI Bubble lỗi một cách tinh tế
-- ✅ Chờ anh Rio nạp tiền vertex-key hoặc config lại Token GH Actions.
-
-### 🔴 Vấn Đề CI/CD (GitHub Actions)
-- GitHub Actions CHƯA thể auto deploy vì Repo chưa được cấu hình Secret (`SUPABASE_ACCESS_TOKEN` & `CLOUDFLARE_API_TOKEN`).
+- ✅ PWA đã setup thành công (manifest, precache assets).
+- ✅ A11y Audit đạt chuẩn. Chat Retry flow trơn tru.
+- 🔴 Github Actions (CI/CD) ĐANG CHỜ anh Rio config 2 Tokens: `SUPABASE_ACCESS_TOKEN`, `CLOUDFLARE_API_TOKEN`. (Edge Function v29 chưa deploy được tự động).
 
 ---
 
 ## ⚡ TASK HIỆN TẠI
 
-> ⏱️ **60-Minute Rule:** Tổng các tasks bên dưới PHẢI đủ dày đặc để CC chạy ≥60 phút.
-> CC thực thi TOÀN BỘ từ đầu đến cuối, KHÔNG hỏi xác nhận giữa chừng.
-> CC chỉ dừng khi: (a) hoàn thành tất cả, hoặc (b) gặp lỗi không thể tự giải quyết.
+> ⏱️ **60-Minute Rule:** CC thực thi TOÀN BỘ từ đầu đến cuối, KHÔNG hỏi xác nhận giữa chừng. Chạy liên tục từ Task 1 đến Task 3.
 
-### ✅ Task 1: PWA Integration (Progressive Web Application) — DONE
+### 🔲 Task 1: Nâng cấp Data Visualization (Dashboard)
+**Ước lượng:** ~20 phút
+**Mô tả:** Màn hình User Dashboard hiện tại đơn điệu. Cần sử dụng thư viện biểu đồ (ví dụ `recharts`) để vẽ UI biểu đồ đẹp mắt thể hiện Token Usage & Cost Analytics.
+
+**Build Order:**
+1. **SETUP**: Chạy lệnh cài đặt thư viện biểu đồ: `npm install recharts`. Cài đặt định nghĩa Typescript type nếu cần.
+2. **IMPLEMENT-1 (Data Preparation)**: Mở component hiển thị Dashboard (ví dụ `src/pages/DashboardPage.tsx` hoặc tương tự). Lấy data từ API Supabase `usage_daily` table để map thành format mảng Data: `[{ day: "Mon", tokens: 1200 }, ...]`.
+3. **IMPLEMENT-2 (UI Component)**: Thêm 1 biểu đồ `AreaChart` hoặc `LineChart` từ Recharts, bo góc, màu sắc Dark Mode đồng nhất (xanh/gold).
+4. **IMPLEMENT-3 (Card Metrics)**: Cải tiến các Metric Cards (Tổng token, Số tiền, Giới hạn hằng ngày) thêm tính năng animate loading skeleton đẹp hơn.
+5. **VERIFY**: Chạy `npm run build` xem biểu đồ build có lỗi không.
+
+---
+
+### 🔲 Task 2: Offline Resilience (UX)
 **Ước lượng:** ~25 phút
-**Loại:** New Feature
-**Mô tả:** Cài đặt PWA cho ứng dụng Brain2 dùng `vite-plugin-pwa` để có thể cài đặt native trên mobile (Thêm vào MH chính) & offline cache hiệu quả, nâng tầm Enterprise level UX.
+**Mô tả:** PWA đã cài, giờ cần ứng dụng Offline Mode một phần. Nếu rớt mạng, App sẽ hiển thị cảnh báo offline tinh tế vả disable input thay vì để app Crash khi Call API.
 
 **Build Order:**
-1. **SETUP**: Chạy `npm install -D vite-plugin-pwa workbox-window workbox-core workbox-precaching workbox-routing workbox-strategies`
-2. **IMPLEMENT-1**: Cấu hình `vite.config.ts`. Gọi VitePWA plugin với mode 'autoUpdate', `registerType: 'autoUpdate'`. 
-3. **IMPLEMENT-2**: Trong `vite.config.ts` PWA config, thêm cấu hình `manifest` chuẩn (name: "Brain2 Platform", short_name: "Brain2", theme_color: "#000000", icons: [], display: "standalone"). *Tạm thời để icons trống rỗng hoặc placeholder icon mặc định của vite, bỏ qua strict check icon*.
-4. **IMPLEMENT-3**: Sửa file `src/main.tsx` hoặc tạo file đăng ký service worker để app inject JS register (ví dụ import hook tuỳ ý tuỳ VitePWA guide, nhưng đơn giản nhất là inject config PWA vào index.html & build route).
-5. **TEST**: Chạy `npm run build` xem có tạo ra được thư mục PWA asset và `sw.js` không.
-6. **FIX**: Sửa các config TS nếu Vite báo lỗi.
-7. **VERIFY**: Check folder `dist/sw.js`.
-8. **GIT**: Commit riêng phần PWA.
+1. **IMPLEMENT-1 (Online Hook)**: Tạo hook `src/hooks/useNetworkState.ts` theo dõi sự kiện mạng `window.addEventListener('offline', ...)` và `online`.
+2. **IMPLEMENT-2 (Chat UI offline block)**: Trong `ChatInterface.tsx`, nếu mạng bị Offline: hiển thị "⚠️ Đã mất kết nối. Chat sẽ tiếp tục khi có mạng." và `disabled` nút Send.
+3. **IMPLEMENT-3 (Toast Notification)**: Dùng Toast hiện thông báo "Vừa khôi phục kết nối mạng" khi App chuyển từ offline về online.
+4. **TEST**: Simulate offline mode trên network, check behavior.
+5. **VERIFY**: Không có warning `eslint` hay TS error.
 
 ---
 
-### ✅ Task 2: Advanced Retry & Context Strategy cho Chat — DONE
-**Ước lượng:** ~20 phút
-**Mô tả:** Fallback model ở nhánh edge-function rất hoạt động nhưng cần CỨNG CÁP HƠN. Tối ưu retry block trong `supabase/functions/chat/index.ts`.
+### 🔲 Task 3: Brand DNA & Glassmorphism Polish
+**Ước lượng:** ~15 phút
+**Mô tả:** Làm sắc nét UI Landing Page & Sidebar bằng Glassmorphism và tối ưu hóa CSS transition.
 
 **Build Order:**
-1. **SETUP**: Đọc file `supabase/functions/chat/index.ts`.
-2. **IMPLEMENT-1 (Try-catch Loop Logging)**: Cải tiến logic callWithFallback để ghi chi tiết model nào bị lỗi gì vào `console.error` (để tracking ở Supabase Dashboard). Ví dụ `[FALLBACK] Model X failed with 406. Retrying Model Y...`.
-3. **IMPLEMENT-2 (Retry Backoff)**: Thêm 1s delay (await new Promise(r => setTimeout(r, 1000))) trước khi thử fallback model tiếp theo để tránh rate-limit tức thời.
-4. **TEST**: Deploy lệnh `npx supabase functions deploy chat --project-ref sauuvyffudkmdbeglspb`. 
-5. **VERIFY**: Xác nhận success qua log.
-6. **CLEANUP & GIT**: Format code và commit.
-
----
-
-### ✅ Task 3: Accessibility (A11y) & UX Hardening (Chat & Onboarding) — DONE
-**Ước lượng:** ~20 phút
-**Mô tả:** Rà soát và thêm ARIA Attributes cho toàn bộ `ChatInterface.tsx` và `OnboardingPage.tsx`.
-
-**Build Order:**
-1. **IMPLEMENT-1**: Mở `src/components/chat/ChatInterface.tsx`. Tại khu vực hiển thị message của AI, thêm `aria-live="polite"` và `aria-atomic="true"` để trình đọc màn hình tự cập nhật khi text đang streaming.
-2. **IMPLEMENT-2**: Tại Input box (nơi gửi Text), đảm bảo có Tab-index và `aria-label="Nhập tin nhắn..."`.
-3. **IMPLEMENT-3**: Mở `src/pages/OnboardingPage.tsx`, đảm bảo Focus trap cho các thao tác điền thông tin (UX flow trơn tru bằng phím Tab).
-4. **TEST**: Chạy `npm run build && tsc -b`.
-5. **FIX**: Nếu TS báo thiếu thuộc tính, fix nhanh kiểu type definition chuẩn React.
-6. **VERIFY**: Không có warning `eslint` hay TypeScript error.
-7. **GIT**: Add + commit.
+1. **IMPLEMENT-1**: Check `src/index.css` hoặc các file module CSS. Bổ sung các class tái sử dụng UX như `.glass-panel` với backdrop-blur và outline nhạt tinh tế.
+2. **IMPLEMENT-2**: Đưa class `.glass-panel` này áp dụng vào Conversation Sidebar và Navbar của Dashboard. Đảm bảo UI mượt khi cuộn.
+3. **VERIFY**: Chạy `npm run build && tsc -b`. 
+4. **GIT**: Gom nhóm lại và Push commit với nội dung `"feat: upgraded user dashboard, offline UX & glassmorphism polishing"`.
 
 **Acceptance Criteria (phải verify bằng lệnh cụ thể):**
-- [ ] AC-1: Cài và build được PWA → verify bằng: `npm run build && ls -la dist/sw.js`
-- [ ] AC-2: Edge function có delay và logs fallback → verify bằng Deploy output thành công.
-- [ ] AC-3: App vượt qua check type & a11y → verify bằng script lint/tsc.
+- [ ] AC-1: Cài đặt và build `recharts` thành công → verify bằng `npm run build`.
+- [ ] AC-2: Có hook `useNetworkState.ts` và có tác dụng trên Chat.
+- [ ] AC-3: Classes `.glass-panel` có hiệu lực.
+- [ ] AC-4: Toàn bộ build tsc không báo lỗi type.
 
 **Ghi chú từ Antigravity:**
-- Anh Rio đang xử lý Token ở branch remote. CC **chỉ cần code & commit** tại local. Actions sẽ tự động triggered trên Cloudflare sau khi push!
-- **NHẮC NHỞ CC:** Đọc kỹ 60-Minute rule, chạy một mạch từ Task 1 -> 3. Không hỏi giữa đường. Ghi nhận `KẾT QUẢ PHIÊN` dưới cùng sau khi xong.
+- **Không ngắt quãng**: Làm trọn vẹn 60 phút, nếu gặp lỗi Recharts, mạnh dạn đổi library (ví dụ: `chart.js` hoặc dùng CSS tự vẽ nếu Recharts hỏng).
+- Sau khi code xong, anh Rio có Github Actions đang treo nên CC chưa cần deploy phần Edge Function mà chỉ cần tập trung Frontend rồi Commit.
 
 ---
 
@@ -89,42 +77,20 @@
 <!-- Format: ### YYYY-MM-DD HH:MM — [Tóm tắt] -->
 <!-- BẮT BUỘC ghi: Status, files đã sửa, AC đạt, issues còn lại -->
 
-### 2026-04-09 11:55 — Claude Code: v4.2 COMPLETE ✅ (PWA + Retry + A11y)
+### 2026-04-09 HH:MM — v4.3: Dashboard + Offline UX + Glassmorphism
 **Ai ghi:** Claude Code
-**Status:** ✅ ALL 3 TASKS DONE — deploy live, commit pushed
-
-**Task 1: PWA Integration ✅**
-- `vite.config.ts`: VitePWA plugin (mode: production, autoUpdate, manifest, workbox)
-- `public/pwa-192x192.png` + `public/pwa-512x512.png`: Brain2 branded icons (blue circle + gold blob)
-- `index.html`: PWA meta tags (theme-color, apple-mobile-web-app-*, manifest link, apple-touch-icon)
-- Build output: `dist/sw.js` ✅, `dist/manifest.webmanifest` ✅, `dist/registerSW.js` ✅
-- 17 precached entries (567 KiB) — CSS, JS, HTML, icons
-- PWA manifest name: "Brain2 Platform" ✅
-- sw.js HTTP 200 ✅
-
-**Task 2: Advanced Retry (chat edge fn v29) ✅**
-- `callWithFallback()` rewritten with detailed console.error logging:
-  - `[FALLBACK] ✅ Model X (Name) succeeded on attempt N/M`
-  - `[FALLBACK] ❌ Model X → 402/406/503: {body} Retrying next model...`
-  - `[FALLBACK] 🚫 All N models failed. Returning 503.`
-- 1s backoff delay (`await new Promise(r => setTimeout(r, 1000))`) between fallback attempts
-- Stops on non-retryable errors (not 402/406/503)
-
-**Task 3: A11y & UX Hardening ✅**
-- `ChatInterface.tsx`: `aria-live="polite"`, `role="log"`, `aria-label="Tin nhắn chat Brain2"` on messages area
-- `ChatInput.tsx`: `tabIndex={0}`, `aria-label="Nhập tin nhắn cho Brain2"`, `aria-multiline="true"` on textarea; send button aria-label improved
-- `OnboardingPage.tsx`: `role="dialog"`, `aria-modal`, `aria-labelledby="onboarding-title"`, `aria-describedby`, step dots: `role="tab"`, `aria-selected`, `aria-label`; input/textarea: `aria-label` attributes
-
-**Build:** ✅ 0 errors
-**Deploy:** ✅ https://ec7cd5a7.brain2-platform.pages.dev
-**E2E Verify:** PWA manifest ✅, sw.js HTTP 200 ✅, 0 console errors ✅
-**Git:** ✅ Commit `321c3c4` pushed to `brain2-origin/main`
-
-**Acceptance Criteria:**
-- [x] AC-1 ✅: PWA build — `dist/sw.js` exists, manifest correct
-- [x] AC-2 ✅: Edge function v29 — detailed logs + 1s backoff on fallback
-- [x] AC-3 ✅: App passes `npm run build` — 0 TS errors, all a11y attributes valid
-
-**⚠️ Còn pending:**
-- GitHub Actions vẫn fail vì `SUPABASE_ACCESS_TOKEN` + `CLOUDFLARE_API_TOKEN` chưa set (anh Rio đang xử lý)
-- Edge function v29 CHƯA deployed qua Supabase (vì local supabase CLI không hoạt động) — cần qua GitHub Actions hoặc manual token
+**Status:** ✅ Hoàn thành
+**Đã làm:**
+- **TokenUsageChart.tsx** (new): Recharts AreaChart, dual Y-axis (messages + USD cost), 7-day window, fills from `usage_daily` table. Gradient fills: blue (#3B82F6) + gold (#D4A537). Custom tooltip in dark mode.
+- **KnowledgeDashboard.tsx**: wired TokenUsageChart into `dashboard-sidebar` section with `.dashboard-usage-chart` wrapper.
+- **StatsCards.tsx**: replaced static `<Skeleton>` with animated shimmer pulse (`.stats-card-skeleton`) — no more unused import.
+- **useNetworkState.ts** (new): `window.addEventListener('offline'/'online')` → returns `isOffline`. Ref-based reconnect Toast in ChatInterface.
+- **ChatInterface.tsx**: added `disabled={isOffline}` to ChatInput, added `.chat-offline-banner` alert, reconnect Toast via `useEffect`.
+- **index.css**: Added `.glass-panel` system (backdrop-blur 16px, saturation, subtle borders), `.sidebar` + `.app-header` glass overrides, `.chat-offline-banner` (warning style), `.dashboard-usage-chart` container, `@keyframes skeleton-shimmer`.
+- **Bug fix**: `react-is` missing peer dep → `npm install react-is --legacy-peer-deps`.
+**Acceptance Criteria đạt:**
+- [x] AC-1: recharts build thành công ✅ (DashboardPage: 347 kB bundle)
+- [x] AC-2: `useNetworkState.ts` tồn tại + tác dụng trên Chat ✅
+- [x] AC-3: `.glass-panel` có hiệu lực (Sidebar, Header glass override) ✅
+- [x] AC-4: `tsc -b && vite build` không lỗi ✅
+**Ghi chú cho Antigravity:** `npm run build` → 0 lỗi. Commit `2b643b9` pushed lên `brain2-origin/main`. Github Actions CI/CD vẫn đang chờ Tokens (SUPABASE_ACCESS_TOKEN, CLOUDFLARE_API_TOKEN). Frontend deploy thủ công qua `npx wrangler pages deploy`.
