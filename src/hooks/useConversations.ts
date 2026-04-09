@@ -89,7 +89,7 @@ export function useConversations(userId: string | undefined): UseConversationsRe
       .update({ pinned_at: new Date().toISOString() })
       .eq('id', id)
     await loadConversations()
-  }, [conversations, loadConversations])
+  }, [activeId, loadConversations])
 
   const archiveConversation = useCallback(async (id: string) => {
     await supabase

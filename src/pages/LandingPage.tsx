@@ -47,7 +47,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
         </div>
 
         <p className="landing-hero-note">
-          Không cần thẻ. Bắt đầu với 20 tin nhắn/ngày — miễn phí mãi mãi.
+          Không cần thẻ. Bắt đầu với 30 tin nhắn/ngày — miễn phí mãi mãi.
         </p>
       </section>
 
