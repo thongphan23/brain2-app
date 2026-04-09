@@ -9,8 +9,8 @@
 ## 🗺️ TRẠNG THÁI HIỆN TẠI
 
 **Cập nhật lần cuối:** Chủ động ghi đè bởi Antigravity (2026-04-09)
-**Phiên bản:** v4.2 — CI/CD, PWA & UX Mastery
-**Tình trạng chung:** 🟡 STABLE — App online ổn định. Handoff v3.2 kết thúc thành công với 100% Phase hoàn tất (Fallback chain & E2E). 
+**Phiên bản:** v4.2 — CI/CD, PWA & UX Mastery ✅
+**Tình trạng chung:** ✅ COMPLETE — Tất cả 3 tasks (PWA + Retry + A11y) đã xong, deploy live, commit pushed. 
 
 ### Kết quả các phiên trước:
 - ✅ Xong Fallback Chain nhiều AI Models cho Chat (Nếu model 1 chết -> thử model 2)
@@ -28,7 +28,7 @@
 > CC thực thi TOÀN BỘ từ đầu đến cuối, KHÔNG hỏi xác nhận giữa chừng.
 > CC chỉ dừng khi: (a) hoàn thành tất cả, hoặc (b) gặp lỗi không thể tự giải quyết.
 
-### 🔲 Task 1: PWA Integration (Progressive Web Application)
+### ✅ Task 1: PWA Integration (Progressive Web Application) — DONE
 **Ước lượng:** ~25 phút
 **Loại:** New Feature
 **Mô tả:** Cài đặt PWA cho ứng dụng Brain2 dùng `vite-plugin-pwa` để có thể cài đặt native trên mobile (Thêm vào MH chính) & offline cache hiệu quả, nâng tầm Enterprise level UX.
@@ -45,7 +45,7 @@
 
 ---
 
-### 🔲 Task 2: Advanced Retry & Context Strategy cho Chat
+### ✅ Task 2: Advanced Retry & Context Strategy cho Chat — DONE
 **Ước lượng:** ~20 phút
 **Mô tả:** Fallback model ở nhánh edge-function rất hoạt động nhưng cần CỨNG CÁP HƠN. Tối ưu retry block trong `supabase/functions/chat/index.ts`.
 
@@ -59,7 +59,7 @@
 
 ---
 
-### 🔲 Task 3: Accessibility (A11y) & UX Hardening (Chat & Onboarding)
+### ✅ Task 3: Accessibility (A11y) & UX Hardening (Chat & Onboarding) — DONE
 **Ước lượng:** ~20 phút
 **Mô tả:** Rà soát và thêm ARIA Attributes cho toàn bộ `ChatInterface.tsx` và `OnboardingPage.tsx`.
 
