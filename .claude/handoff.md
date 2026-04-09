@@ -1,4 +1,4 @@
-# 📋 Sổ Bàn Giao v3.0 — Brain2 Platform: FULL STABILIZATION
+# 📋 Sổ Bàn Giao v3.1 — Brain2 Platform: FULL STABILIZATION
 
 > File này là kênh giao tiếp 2 chiều giữa Antigravity (PM) và Claude Code (Builder).
 > ⚠️ File này là NGUỒN SỰ THẬT DUY NHẤT sau khi /clear — đọc KỸ trước khi làm.
@@ -7,30 +7,62 @@
 
 ## 🗺️ TRẠNG THÁI HIỆN TẠI
 
-**Cập nhật lần cuối:** 2026-04-08 15:40
-**Phiên bản:** v3.0 — FULL PRODUCTION STABILIZATION
-**Tình trạng chung:** 🔴 CRITICAL — App online nhưng chat KHÔNG hoạt động + nhiều tính năng chưa kiểm tra
+**Cập nhật lần cuối:** 2026-04-09 08:20
+**Phiên bản:** v3.1 — FULL PRODUCTION STABILIZATION
+**Tình trạng chung:** 🔴 CRITICAL — Chat CHẾT do vertex-key hết balance + cần fallback sang FREE models
 
-### Tiến độ qua 3 phiên audit (bugs 1-11):
+### Tiến độ qua 4 phiên audit:
 - ✅ BUG 1-10: Auth architecture, PKCE, infinite loops → FIXED
 - ✅ BUG 11: Onboarding freeze → FIXED (RLS UPDATE + fetchingRef reset)
 - ✅ Landing page renders đẹp
 - ✅ Onboarding 3 steps chạy mượt
-- ✅ RLS policies đầy đủ cho profiles (SELECT, INSERT, UPDATE)
+- ✅ RLS policies đầy đủ cho tất cả tables
+- ✅ Supabase.ai embedding (gte-small) HOẠT ĐỘNG OK
+- 🔴 BUG 12: Chat CHẾT — vertex-key balance = 0 (root cause XÁC NHẬN)
+- 🔴 Claude Code CHƯA LÀM task v3.0 nào (handoff giao nhưng CC chưa chạy)
 
-### 🔴 BUG HIỆN TẠI — BUG 12: Chat CHẾT HOÀN TOÀN
-**Triệu chứng (user báo):** "Khi chat, hệ thống mất luôn đoạn chat, không phản hồi không gì cả"
-**Bằng chứng từ edge function logs:**
-```
-POST | 503 | /functions/v1/chat — execution_time_ms: 2359
-```
-→ Edge function `chat` trả **503 Service Unavailable** → vertex-key.com API fail
+### 🔴 BUG 12: Chat CHẾT — ROOT CAUSE ĐÃ XÁC NHẬN (Antigravity diagnostic 2026-04-09)
 
-**Root causes khả năng:**
-1. `VERTEX_KEY_API_KEY` secret hết balance / sai key
-2. Model ID `gemini-2.5-flash-chat` không đúng format vertex-key.com yêu cầu
-3. Frontend nhận 503 nhưng `contentType` check ĐÚNG (non-streaming error path thử parse JSON) → user message bị XÓA khỏi UI (`setMessages(prev => prev.filter(...))`), nên "mất luôn đoạn chat"
-4. Edge function dùng `Supabase.ai.Session('gte-small')` cho embedding — có thể fail và gây lỗi logic flow
+**Bằng chứng trực tiếp (đã test qua edge function `test-vertex`):**
+```
+# Paid models (gemini, claude, gpt): 402 Insufficient balance
+gemini-2.5-flash-chat → 402 "Insufficient balance. Please top up at the dashboard."
+gemini-2.5-flash      → 402 "Insufficient balance. Please top up at the dashboard."
+
+# Free models: 406 Upstream error (vertex-key infra issue)
+free/deepseek-v3.2  → 406 "Upstream returned an error"
+free/kimi-k2        → 406 "Upstream returned an error"
+free/qwen3-235b     → 406 "Upstream returned an error"
+free/qwen3-max      → 406 "Upstream returned an error"
+```
+
+**Supabase.ai embedding:** ✅ HOẠT ĐỘNG (gte-small, 384 dimensions)
+**Key status:** `vai-b...` — key hợp lệ, nhưng balance = 0
+
+**Tác động frontend:**
+1. Edge function trả 503 JSON (non-streaming)
+2. `useChat.ts` parse error → XÓA user message khỏi UI
+3. User thấy: tin nhắn biến mất, không có error message
+
+**Chiến lược fix (v3.1):**
+1. **Backend:** Implement multi-provider fallback chain — thử free models trước, rồi paid
+2. **Backend:** Nếu TẤT CẢ fail → trả error JSON RÕ RÀNG
+3. **Frontend:** KHÔNG xóa user message khi error — hiện error bubble thay thế
+4. **Frontend:** Retry button cho user
+
+**FREE text models khả dụng trên vertex-key:**
+| Model ID | Context | Max Output | Status |
+|----------|---------|------------|--------|
+| `free/deepseek-v3.2` | 65K | 8K | 406 (tạm) |
+| `free/kimi-k2` | 131K | 8K | 406 (tạm) |
+| `free/kimi-k2-0905` | 131K | 8K | 406 (tạm) |
+| `free/qwen3-235b` | 131K | 8K | 406 (tạm) |
+| `free/qwen3-max` | 131K | 8K | 406 (tạm) |
+| `free/qwen3-coder-plus` | 131K | 8K | 406 (tạm) |
+| `free/deepseek-r1` | 65K | 8K | 406 (tạm) |
+
+> ⚠️ Free models đang trả 406 upstream error — có thể là tạm thời.
+> Claude Code PHẢI implement fallback chain để thử NHIỀU models, kể cả free lẫn paid.
 
 ---
 
@@ -73,79 +105,113 @@ POST | 503 | /functions/v1/chat — execution_time_ms: 2359
 
 ## PHASE 1: FIX CHAT (🔴 CRITICAL — làm ĐẦU TIÊN)
 
-### BUG 12: Chat trả 503, user message biến mất
+### BUG 12: Chat 503 — ROOT CAUSE ĐÃ XÁC NHẬN
 
-**Root cause analysis — kiểm tra theo thứ tự:**
+**Root cause:** Vertex-key.com balance = 0. Paid models → 402, free models → 406 (upstream error).
+**Supabase.ai embedding:** ✅ HOẠT ĐỘNG — KHÔNG phải vấn đề.
 
-#### 1.1. Verify VERTEX_KEY_API_KEY
-```bash
-# Test direct API call
-curl -s -X POST "https://vertex-key.com/api/v1/chat/completions" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(supabase functions env list --project-ref sauuvyffudkmdbeglspb 2>/dev/null | grep VERTEX_KEY_API_KEY | awk '{print $2}')" \
-  -d '{"model": "gemini-2.5-flash-chat", "messages": [{"role": "user", "content": "Hello"}], "max_tokens": 50}' | head -200
+#### 1.1. Backend: Implement Multi-Provider Fallback Chain
+**File:** `supabase/functions/chat/index.ts`
+
+**CHIẾN LƯỢC:** Thay đổi MODELS config để:
+1. Default model cho free tier = `free/qwen3-235b` (131K context, FREE)
+2. Thêm fallback chain: nếu model chính fail → thử FREE models lần lượt
+3. Giữ paid models cho pro/vip tier nhưng LUÔN có free fallback
+
+**Cụ thể — sửa MODELS object (dòng 58-69):**
+```typescript
+const MODELS: Record<string, { vertexId: string; name: string; maxTokens: number; costPer1kInput: number; costPer1kOutput: number; fallbacks?: string[] }> = {
+  // FREE models (ưu tiên cho free tier)
+  "free/qwen3-235b": { vertexId: "free/qwen3-235b", name: "Qwen3 235B (Free)", maxTokens: 8192, costPer1kInput: 0, costPer1kOutput: 0, fallbacks: ["free/deepseek-v3.2", "free/kimi-k2", "free/qwen3-max"] },
+  "free/deepseek-v3.2": { vertexId: "free/deepseek-v3.2", name: "DeepSeek V3.2 (Free)", maxTokens: 8192, costPer1kInput: 0, costPer1kOutput: 0, fallbacks: ["free/qwen3-235b", "free/kimi-k2"] },
+  "free/kimi-k2": { vertexId: "free/kimi-k2", name: "Kimi K2 (Free)", maxTokens: 8192, costPer1kInput: 0, costPer1kOutput: 0, fallbacks: ["free/qwen3-235b", "free/deepseek-v3.2"] },
+  // PAID models (cần balance)
+  "gemini-2.5-flash": { vertexId: "gemini-2.5-flash-chat", name: "Gemini 2.5 Flash", maxTokens: 8192, costPer1kInput: 0.00015, costPer1kOutput: 0.0006, fallbacks: ["free/qwen3-235b", "free/deepseek-v3.2"] },
+  "gemini-2.5-pro": { vertexId: "gemini-2.5-pro-chat", name: "Gemini 2.5 Pro", maxTokens: 8192, costPer1kInput: 0.00125, costPer1kOutput: 0.01, fallbacks: ["gemini-2.5-flash-chat", "free/qwen3-235b"] },
+  // ... giữ các model khác nhưng THÊM fallbacks: ["free/qwen3-235b"] cho tất cả
+};
 ```
-→ Nếu trả error balance/auth → KEY HẾT TIỀN hoặc SAI
-→ Nếu trả 404 model → MODEL ID SAI
 
-**ALTERNATIVE:** Nếu không lấy được key trực tiếp, test qua edge function:
-```bash
-curl -s -X GET "https://sauuvyffudkmdbeglspb.supabase.co/functions/v1/chat"
+**Sửa callAI logic (dòng 196-207) → Fallback chain:**
+```typescript
+const callWithFallback = async (primaryModel: string, fallbacks: string[] = []) => {
+  const allModels = [primaryModel, ...fallbacks];
+  for (const modelId of allModels) {
+    try {
+      const res = await fetch(`${VERTEX_KEY_URL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${VERTEX_KEY_API_KEY}` },
+        body: JSON.stringify({ model: modelId, messages, stream: true, max_tokens: modelConfig.maxTokens, temperature: 0.7 }),
+      });
+      if (res.ok) return { response: res, usedModel: modelId };
+      // If 402 (balance) or 406 (upstream) → try next
+      if (res.status === 402 || res.status === 406 || res.status === 503) continue;
+      return { response: res, usedModel: modelId }; // Other errors → stop
+    } catch { continue; }
+  }
+  return null; // All failed
+};
 ```
-→ Trả JSON với `models` array + `version` + `status`
 
-#### 1.2. Kiểm tra model IDs
-File `supabase/functions/chat/index.ts` dòng 58-69 define MODELS:
-- `gemini-2.5-flash` → vertexId `gemini-2.5-flash-chat`
-- `gemini-2.5-pro` → vertexId `gemini-2.5-pro-chat`
+**Default model cho FREE tier user:** Đổi từ `gemini-2.5-flash` → `free/qwen3-235b`
 
-**⚠️ QUAN TRỌNG:** vertex-key.com có thể KHÔNG dùng suffix `-chat`. Kiểm tra documentation hoặc test trực tiếp. Có thể cần thay đổi thành:
-- `gemini-2.5-flash` (không có `-chat`)
-- `google/gemini-2.5-flash-preview-04-17` (format đầy đủ)
+#### 1.2. Frontend: Fix error handling trong `useChat.ts`
+**File:** `src/hooks/useChat.ts` dòng 82-94
 
-#### 1.3. Fix frontend error handling
-File `src/hooks/useChat.ts` dòng 82-94:
-- Khi server trả non-streaming response → code parse JSON → remove user message
-- **Vấn đề:** User thấy tin nhắn biến mất mà KHÔNG thấy error message
-- **Fix:** Giữ user message + hiện error toast rõ ràng
-
+**TRƯỚC (xấu) — xóa user message:**
 ```tsx
-// TRƯỚC (xấu):
 setMessages(prev => prev.filter(m => m.id !== userMessage.id))
+```
 
-// SAU (tốt):
-// KHÔNG xóa userMessage. Thêm error bubble DƯỚI user message
+**SAU (tốt) — giữ message, hiện error bubble:**
+```tsx
+// KHÔNG xóa userMessage
 setMessages(prev => [...prev, {
   id: crypto.randomUUID(),
-  role: 'assistant',
+  role: 'assistant' as const,
   content: `⚠️ ${errData.message || 'Không thể kết nối AI. Vui lòng thử lại.'}`,
-  conversation_id: '',
+  conversation_id: existingConvId || conversationId || '',
   created_at: new Date().toISOString(),
 }])
 ```
 
-#### 1.4. Kiểm tra Supabase.ai.Session embedding
-```typescript
-// Dòng 163 trong chat/index.ts:
-const aiSession = new Supabase.ai.Session('gte-small');
-```
-→ Nếu Supabase không có `gte-small` model trên FREE tier → crash toàn bộ flow
-→ Fix: Wrap trong try-catch MẠNH HƠN, nếu embedding fail → skip RAG, vẫn chat bình thường
+#### 1.3. Frontend: Update default model cho free tier
+**File:** `src/hooks/useChat.ts` dòng 33
+- Đổi `useState('gemini-2.5-flash')` → `useState('free/qwen3-235b')`
 
-#### 1.5. Verify rate limit RPC
-```sql
--- Kiểm tra check_rate_limit function
-SELECT check_rate_limit('some-test-user-id-here');
-```
-→ Nếu RPC fail → tiếp tục vì code đã có try-catch, nhưng VERIFY
+**File:** `src/components/chat/ChatInterface.tsx` dòng 41
+- Đổi `useState('gemini-2.5-flash')` → `useState('free/qwen3-235b')`
 
-#### 1.6. TEST CHAT sau khi fix:
-1. Login Google → vào /chat
+**File:** `src/hooks/useTier.ts` dòng 45
+- Update `getAllowedModels` để free tier dùng free models:
+```tsx
+const free = ['free/qwen3-235b', 'free/deepseek-v3.2', 'free/kimi-k2']
+const pro = [...free, 'gemini-2.5-flash', 'gemini-2.5-pro', 'prx/claude-sonnet-4-6', 'gpt-4o']
+```
+
+**File:** `src/components/chat/ModelSelector.tsx`
+- Update UI labels cho free models
+
+#### 1.4. Deploy + Test
+```bash
+# Deploy edge function
+npx supabase functions deploy chat --project-ref sauuvyffudkmdbeglspb
+
+# Build + Deploy frontend
+npm run build
+npx wrangler pages deploy dist/ --project-name brain2-platform
+```
+
+#### 1.5. TEST CHAT:
+1. Visit brain2.thongphan.com → Login → Chat
 2. Gõ "Xin chào" → nhấn Send
-3. Phải thấy: user bubble + streaming AI response
-4. Console: KHÔNG có error 503
+3. **Expected:** User bubble + AI streaming response (từ free model)
+4. **Nếu free models vẫn 406:** Hiện error bubble RÕ RÀNG, KHÔNG xóa user message
+5. Console: KHÔNG có uncaught errors
 
-**CRITICAL: Nếu chat vẫn fail sau fix code → vấn đề là ở VERTEX_KEY_API_KEY balance. Báo Antigravity để nạp tiền.**
+> ⚠️ **LƯU Ý:** Free models trên vertex-key đang trả 406 upstream error (tạm thời).
+> Nếu TẤT CẢ models fail → chat PHẢI hiện error message thân thiện, KHÔNG crash/freeze.
+> Khi vertex-key phục hồi hoặc anh nạp tiền → chat sẽ tự hoạt động lại.
 
 ---
 
@@ -531,6 +597,24 @@ curl -s "https://brain2.thongphan.com/" | grep -o 'index-[A-Za-z0-9_-]*\.js' | h
 <!-- Claude Code: ghi kết quả ở ĐẦU mục này, MỖI PHIÊN MỘT ENTRY -->
 <!-- Format: ### YYYY-MM-DD HH:MM — [Tóm tắt] -->
 <!-- BẮT BUỘC ghi: Status, files đã sửa, AC đạt, issues còn lại -->
+
+### 2026-04-09 08:20 — Antigravity diagnostic + update v3.1
+**Ai ghi:** Antigravity
+**Status:** 🔴 ROOT CAUSE XÁC NHẬN — update task cho Claude Code
+
+**Diagnostic kết quả (test qua edge function `test-vertex`):**
+- Paid models (gemini, claude, gpt): **402 Insufficient balance**
+- Free models (deepseek, kimi, qwen): **406 Upstream returned an error**
+- Supabase.ai embedding (gte-small): ✅ **HOẠT ĐỘNG** (384 dimensions)
+- Claude Code **CHƯA CHẠY** task v3.0 nào — handoff vẫn nguyên
+
+**Chiến lược mới v3.1:**
+1. Implement FREE model fallback chain trong chat edge function
+2. Fix frontend: KHÔNG xóa user message khi error, hiện error bubble
+3. Update default model: free tier → `free/qwen3-235b`
+4. Full feature audit vẫn giữ nguyên (Phase 2-5)
+
+---
 
 ### 2026-04-08 15:40 — Antigravity tạo handoff v3.0 FULL STABILIZATION
 **Ai ghi:** Antigravity
