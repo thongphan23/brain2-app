@@ -1,5 +1,3 @@
-import { Skeleton } from '../shared/Skeleton'
-
 interface StatsCardsProps {
   totalNotes: number
   totalConnections: number
@@ -23,7 +21,11 @@ export function StatsCards({ totalNotes, totalConnections, domainCount, overallS
       {CARDS.map((card, i) => (
         <div key={card.key} className="stats-card">
           {loading ? (
-            <Skeleton height="60px" />
+            <div className="stats-card-skeleton">
+              <div className="skeleton-pulse skeleton-icon" />
+              <div className="skeleton-pulse skeleton-value" />
+              <div className="skeleton-pulse skeleton-label" />
+            </div>
           ) : (
             <>
               <div className="stats-card-icon" style={{ color: card.color }}>{card.icon}</div>

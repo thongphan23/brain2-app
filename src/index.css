@@ -3010,3 +3010,99 @@ a:hover { text-decoration: underline; }
   opacity: 1;
   transition: opacity 0.2s;
 }
+
+/* ═══ Glassmorphism System — v4.3 ══════════════════════════════ */
+
+.glass-panel {
+  background: hsla(225, 20%, 12%, 0.72);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid hsla(220, 15%, 35%, 0.25);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 4px 24px hsla(0, 0%, 0%, 0.35),
+    inset 0 1px 0 hsla(220, 15%, 55%, 0.06);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.glass-panel:hover {
+  border-color: hsla(220, 15%, 40%, 0.4);
+  box-shadow:
+    0 6px 32px hsla(0, 0%, 0%, 0.45),
+    inset 0 1px 0 hsla(220, 15%, 60%, 0.08);
+}
+
+/* Sidebar glass override */
+.sidebar {
+  background: hsla(225, 20%, 9%, 0.88);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-right: 1px solid hsla(225, 15%, 25%, 0.5);
+}
+
+/* Header glass override */
+.app-header {
+  background: hsla(225, 20%, 8%, 0.85);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border-bottom: 1px solid hsla(225, 15%, 20%, 0.5);
+}
+
+/* Stats card skeleton pulse */
+.stats-card-skeleton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+.skeleton-pulse {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    hsla(225, 16%, 16%, 1) 0%,
+    hsla(225, 16%, 22%, 1) 50%,
+    hsla(225, 16%, 16%, 1) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-icon  { width: 28px; height: 28px; border-radius: var(--radius-sm); }
+.skeleton-value { width: 80%; height: 32px; }
+.skeleton-label { width: 60%; height: 12px; }
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Chat offline banner */
+.chat-offline-banner {
+  margin: 12px 16px 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: hsla(35, 90%, 55%, 0.12);
+  border: 1px solid hsla(35, 90%, 55%, 0.3);
+  color: hsl(35, 90%, 65%);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Dashboard usage chart section */
+.dashboard-usage-chart {
+  background: hsla(225, 20%, 12%, 0.5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-top: 12px;
+}
+

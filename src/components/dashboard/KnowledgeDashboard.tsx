@@ -4,6 +4,7 @@ import { StatsCards } from './StatsCards'
 import { MaturityChart } from './MaturityChart'
 import { RecommendationCards } from './RecommendationCards'
 import { UsageStats } from './UsageStats'
+import { TokenUsageChart } from './TokenUsageChart'
 import { useAnalytics } from '../../hooks/useAnalytics'
 import { useTier } from '../../hooks/useTier'
 import { useAuth } from '../../hooks/useAuth'
@@ -80,6 +81,12 @@ export function KnowledgeDashboard() {
             notesCreated={usageToday.notes_created}
             tier={tier}
           />
+          <div className="dashboard-usage-chart">
+            <div className="dashboard-section-title" style={{ fontSize: 'var(--text-sm)', marginBottom: '8px' }}>
+              📈 7 Ngày Gần Nhất
+            </div>
+            <TokenUsageChart userId={user?.id} />
+          </div>
           <RecommendationCards
             recommendations={recommendations}
             onDismiss={dismissRecommendation}

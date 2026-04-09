@@ -8,6 +8,7 @@ import { useChat } from '../../hooks/useChat'
 import { useConversations } from '../../hooks/useConversations'
 import { useVault } from '../../hooks/useVault'
 import { useTier } from '../../hooks/useTier'
+import { useNetworkState } from '../../hooks/useNetworkState'
 import { useToast } from '../shared/Toast'
 import type { TierType, CognitiveTool } from '../../lib/types'
 import type { Profile } from '../../lib/types'
@@ -66,6 +67,16 @@ export function ChatInterface({
   const { success, error: showError } = useToast()
   const { createNote, refreshNotes } = useVault(userId)
   const { usageToday, limits, checkCanSendMessage, refreshUsage } = useTier(userId)
+  const isOffline = useNetworkState()
+
+  // IMPLEMENT-3: Toast on reconnect
+  const prevOffline = useRef(false)
+  useEffect(() => {
+    if (prevOffline.current && !isOffline) {
+      success('Kết nối đã khôi phục', 'Vừa khôi phục kết nối mạng. Bạn có thể tiếp tục chat.')
+    }
+    prevOffline.current = isOffline
+  }, [isOffline, success])
 
   // Refresh usage on mount
   useEffect(() => {
@@ -218,6 +229,11 @@ export function ChatInterface({
 
       {/* Messages Area */}
       <div className="chat-messages-area">
+        {isOffline && (
+          <div className="chat-offline-banner" role="alert">
+            ⚠️ Đã mất kết nối. Chat sẽ tiếp tục khi có mạng.
+          </div>
+        )}
         {!hasMessages && !isStreaming ? (
           /* Welcome State */
           <div className="chat-welcome">
@@ -310,6 +326,7 @@ export function ChatInterface({
           onChange={setInput}
           onSend={handleSend}
           isStreaming={isStreaming}
+          disabled={isOffline}
           placeholder={`Hỏi ${activeModes.find(m => m.slug === activeMode)?.name || 'Brain2'}...`}
           modelSelector={
             <ModelSelector
