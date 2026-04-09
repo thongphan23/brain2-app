@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "GET") {
     return new Response(JSON.stringify({
-      status: "ok", version: 28,
+      status: "ok", version: 29,
       features: ["global-rules", "vault-context", "streaming", "user-id-fix", "multi-model-fallback"],
       models: Object.entries(MODELS).map(([id, m]) => ({ id, name: m.name })),
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -202,7 +202,8 @@ Deno.serve(async (req: Request) => {
     // AI call — try primary model, then each fallback in order
     const callWithFallback = async (primaryKey: string, fallbacks: string[]): Promise<{ response: Response; usedModel: string } | null> => {
       const allModelKeys = [primaryKey, ...fallbacks].filter(k => MODELS[k])
-      for (const mk of allModelKeys) {
+      for (let i = 0; i < allModelKeys.length; i++) {
+        const mk = allModelKeys[i]
         const mc = MODELS[mk]
         try {
           const res = await fetch(`${VERTEX_KEY_URL}/chat/completions`, {
@@ -210,13 +211,32 @@ Deno.serve(async (req: Request) => {
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${VERTEX_KEY_API_KEY}` },
             body: JSON.stringify({ model: mc.vertexId, messages, stream: true, max_tokens: mc.maxTokens, temperature: 0.7 }),
           });
-          if (res.ok) return { response: res, usedModel: mk }
-          // 402 (balance), 406 (upstream), 503 (service) → try next
-          if (res.status === 402 || res.status === 406 || res.status === 503) continue
-          // Other errors → stop (not retriable)
-          return { response: res, usedModel: mk }
-        } catch { continue }
+          if (res.ok) {
+            console.log(`[FALLBACK] ✅ Model ${mc.vertexId} (${mc.name}) succeeded on attempt ${i + 1}/${allModelKeys.length}`)
+            return { response: res, usedModel: mk }
+          }
+          // Read error body for logging
+          const errBody = await res.text().catch(() => '(no body)')
+          if (res.status === 402) {
+            console.error(`[FALLBACK] ❌ Model ${mc.vertexId} → 402 Insufficient balance. Retrying next model...`)
+          } else if (res.status === 406) {
+            console.error(`[FALLBACK] ❌ Model ${mc.vertexId} → 406 Upstream error: ${errBody.substring(0, 120)}. Retrying next model...`)
+          } else if (res.status === 503) {
+            console.error(`[FALLBACK] ❌ Model ${mc.vertexId} → 503 Service unavailable: ${errBody.substring(0, 120)}. Retrying next model...`)
+          } else {
+            console.error(`[FALLBACK] ❌ Model ${mc.vertexId} → HTTP ${res.status}: ${errBody.substring(0, 120)}. Stopping fallback.`)
+            return { response: res, usedModel: mk }
+          }
+          // Retry next model — apply 1s backoff to avoid rate-limit hammering
+          if (i < allModelKeys.length - 1) {
+            await new Promise<void>(resolve => setTimeout(resolve, 1000))
+          }
+        } catch (e) {
+          console.error(`[FALLBACK] ❌ Model ${mc.vertexId} → Network/Catch error: ${String(e)}. Retrying next model...`)
+        }
       }
+      console.error(`[FALLBACK] 🚫 All ${allModelKeys.length} models failed. Returning 503.`)
+      return null
       return null // All failed
     };
 

@@ -68,17 +68,23 @@ export function OnboardingPage() {
   const prevStep = () => setStep((s) => Math.max(s - 1, 0))
 
   return (
-    <div className="onboarding">
-      <div className="onboarding-card animate-scale-in">
+    <div className="onboarding" role="main" aria-label="Brain2 Setup">
+      <div
+        className="onboarding-card animate-scale-in"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="onboarding-title"
+        tabIndex={-1}
+      >
         {/* Header */}
         <div className="onboarding-header">
-          <div className="onboarding-logo">🧠</div>
-          <h1 className="onboarding-title">
+          <div className="onboarding-logo" aria-hidden="true">🧠</div>
+          <h1 className="onboarding-title" id="onboarding-title">
             {step === 0 && 'Chào mừng đến Brain2!'}
             {step === 1 && 'Mục tiêu của bạn là gì?'}
             {step === 2 && 'Bạn muốn hỏi gì đầu tiên?'}
           </h1>
-          <p className="onboarding-subtitle">
+          <p className="onboarding-subtitle" id="onboarding-subtitle">
             {step === 0 && 'Vài bước ngắn để setup Brain2 cho bạn'}
             {step === 1 && 'Chọn những gì bạn muốn đạt được (có thể chọn nhiều)'}
             {step === 2 && 'Không cần hoàn hảo — hỏi bất cứ điều gì bạn đang nghĩ'}
@@ -86,11 +92,15 @@ export function OnboardingPage() {
         </div>
 
         {/* Step indicator */}
-        <div className="onboarding-step-indicator">
-          {[0, 1, 2].map((i) => (
+        <div className="onboarding-step-indicator" role="tablist" aria-label="Bước hiện tại">
+          {[0, 1, 2].map(i => (
             <div
               key={i}
               className={`onboarding-step-dot ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}
+              role="tab"
+              aria-selected={i === step}
+              aria-label={`Bước ${i + 1}`}
+              tabIndex={i === step ? 0 : -1}
             />
           ))}
         </div>
@@ -103,6 +113,7 @@ export function OnboardingPage() {
                 Bạn muốn được gọi là gì?
               </h3>
               <Input
+                aria-label="Tên hiển thị"
                 placeholder="Tên hiển thị..."
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
@@ -152,6 +163,7 @@ export function OnboardingPage() {
               <textarea
                 className="input textarea"
                 placeholder="VD: Mình mới bắt đầu học về tư duy hệ thống. Giải thích cho mình..."
+                aria-label="Câu hỏi đầu tiên cho Brain2"
                 value={firstPrompt}
                 onChange={(e) => setFirstPrompt(e.target.value)}
                 rows={4}

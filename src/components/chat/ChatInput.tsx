@@ -58,6 +58,9 @@ export function ChatInput({
           placeholder={placeholder}
           disabled={disabled || isStreaming}
           rows={1}
+          tabIndex={0}
+          aria-label="Nhập tin nhắn cho Brain2"
+          aria-multiline="true"
           style={{
             flex: 1,
             background: 'transparent',
@@ -78,7 +81,7 @@ export function ChatInput({
           className={`send-btn ${!value.trim() || isStreaming ? 'disabled' : ''}`}
           onClick={onSend}
           disabled={!value.trim() || isStreaming}
-          aria-label="Gửi"
+          aria-label="Gửi tin nhắn"
           style={{
             width: '36px',
             height: '36px',

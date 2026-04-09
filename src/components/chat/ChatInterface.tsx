@@ -245,7 +245,13 @@ export function ChatInterface({
             </div>
           </div>
         ) : (
-          <div className="chat-messages-scroll">
+          <div
+            className="chat-messages-scroll"
+            aria-live="polite"
+            aria-atomic="false"
+            role="log"
+            aria-label="Tin nhắn chat Brain2"
+          >
             {messages.map((msg, idx) => {
               const prevMsg = idx > 0 ? messages[idx - 1] : null
               const isGrouped = prevMsg?.role === msg.role
