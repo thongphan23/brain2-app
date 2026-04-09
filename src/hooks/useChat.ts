@@ -44,7 +44,11 @@ export function useChat(userId: string | undefined): UseChatReturn {
     model: string,
     existingConvId?: string
   ) => {
-    if (!text.trim() || !userId || isStreaming) return
+    if (!text.trim() || isStreaming) return
+    if (!userId) {
+      setError('Chưa đăng nhập. Vui lòng refresh trang.')
+      return
+    }
 
     const userMessage: Message = {
       id: crypto.randomUUID(),

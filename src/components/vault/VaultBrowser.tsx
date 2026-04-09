@@ -143,6 +143,17 @@ export function VaultBrowser() {
                   ? 'Thử từ khóa khác hoặc bỏ bộ lọc'
                   : 'Bắt đầu bằng cách chat với AI — nó sẽ gợi ý lưu insight!'
               }
+              action={
+                !isSearching && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleCreateNote}
+                    style={{ fontSize: 'var(--text-sm)' }}
+                  >
+                    ✨ Tạo Note Nhanh
+                  </button>
+                )
+              }
             />
           ) : (
             <NoteList

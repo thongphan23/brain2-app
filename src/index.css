@@ -1777,6 +1777,8 @@ a:hover { text-decoration: underline; }
 
 @media (max-width: 767px) {
   .sidebar { display: none; }
+  .sidebar.open { display: flex; }
+  .sidebar-toggle-btn { display: flex !important; }
   .landing-hero { padding: var(--space-2xl) var(--space-md); }
   .page-scroll { padding: var(--space-md); }
   .landing-footer { flex-direction: column; gap: var(--space-sm); text-align: center; }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import React from 'react'
 import { Sidebar } from './Sidebar'
 import type { Conversation } from '../../lib/types'
 
@@ -9,6 +10,7 @@ interface AppLayoutProps {
   onNewChat?: () => void
   onSelectConversation?: (id: string) => void
   activeConversationId?: string | null
+  onMenuToggle?: () => void
 }
 
 export function AppLayout({
@@ -18,8 +20,10 @@ export function AppLayout({
   onNewChat,
   onSelectConversation,
   activeConversationId,
+  onMenuToggle: externalMenuToggle,
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const handleMenuToggle = externalMenuToggle ?? (() => setSidebarOpen(v => !v))
 
   return (
     <div className="app-layout">
@@ -46,7 +50,9 @@ export function AppLayout({
 
       {/* Main Content */}
       <div className="main-content">
-        {header}
+        {header
+          ? <>{React.cloneElement(header as React.ReactElement<any>, { onMenuToggle: handleMenuToggle })}</>
+          : null}
         {children}
       </div>
     </div>
