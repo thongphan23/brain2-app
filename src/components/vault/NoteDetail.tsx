@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import type { Note, NoteType, MaturityLevel } from '../../lib/types'
 import { NOTE_TYPES, MATURITY_LEVELS } from '../../lib/constants'
 import { Button } from '../shared/Button'
@@ -223,16 +227,37 @@ export function NoteDetail({ note, onSave, onDelete, onClose }: NoteDetailProps)
               rows={12}
             />
           ) : (
-            <div
-              className="note-content-display"
-              dangerouslySetInnerHTML={{
-                __html: content
-                  .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                  .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                  .replace(/`([^`]+)`/g, '<code>$1</code>')
-                  .replace(/\n/g, '<br>')
-              }}
-            />
+            <div className="note-content-display">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  code({ node, className, children, ...props }: any) {
+                    const inline = !className
+                    if (inline) {
+                      return <code className="md-inline-code" {...props}>{children}</code>
+                    }
+                    const match = /language-(\w+)/.exec(className || '')
+                    return (
+                      <SyntaxHighlighter
+                        style={vscDarkPlus}
+                        language={match ? match[1] : 'text'}
+                        PreTag="div"
+                        customStyle={{
+                          margin: '12px 0',
+                          borderRadius: '8px',
+                          fontSize: '0.85rem',
+                          border: '1px solid hsl(225, 15%, 20%)',
+                        }}
+                      >
+                        {String(children).replace(/\n$/, '')}
+                      </SyntaxHighlighter>
+                    )
+                  },
+                }}
+              >
+                {content}
+              </ReactMarkdown>
+            </div>
           )}
         </div>
 

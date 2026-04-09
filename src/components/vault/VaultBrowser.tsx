@@ -6,8 +6,12 @@ import { NoteList } from './NoteList'
 import { NoteDetail } from './NoteDetail'
 import { SearchBar } from './SearchBar'
 import { FilterChips } from './FilterChips'
+import { VaultTagFilter, type VaultViewFilter } from './VaultTagFilter'
 import { EmptyState } from '../shared/EmptyState'
 import { Skeleton } from '../shared/Skeleton'
+import { useToast } from '../shared/Toast'
+import { exportAllNotes } from '../../lib/exportUtils'
+import type { Note } from '../../lib/types'
 
 export function VaultBrowser() {
   const { user } = useAuth()
@@ -17,8 +21,11 @@ export function VaultBrowser() {
     setFilters, totalCount,
   } = useVault(user?.id)
   const { results: searchResults, loading: searchLoading, search, clear: clearSearch } = useVaultSearch(user?.id)
+  const { success, error: showError } = useToast()
 
   const [creatingNote, setCreatingNote] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [tagFilter, setTagFilter] = useState<VaultViewFilter>('all')
 
   const handleCreateNote = async () => {
     setCreatingNote(true)
@@ -34,7 +41,42 @@ export function VaultBrowser() {
     setCreatingNote(false)
   }
 
-  const displayNotes = searchResults.length > 0 ? searchResults : notes
+  const handleExport = async () => {
+    if (!user) return
+    setExporting(true)
+    try {
+      await exportAllNotes(user.id)
+      success('Đã xuất!', `${totalCount} notes đã được tải về.`)
+    } catch (err) {
+      showError('Lỗi xuất', String(err))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const applyTagFilter = (allNotes: Note[]): Note[] => {
+    switch (tagFilter) {
+      case 'recent': {
+        const weekAgo = new Date()
+        weekAgo.setDate(weekAgo.getDate() - 7)
+        return allNotes.filter(n => new Date(n.updated_at) >= weekAgo)
+      }
+      case 'longform':
+        return allNotes.filter(n => (n.content?.length || 0) > 800)
+      case 'seed':
+        return allNotes.filter(n => n.maturity === 'seed')
+      case 'growing':
+        return allNotes.filter(n => n.maturity === 'growing')
+      case 'permanent':
+        return allNotes.filter(n => n.maturity === 'permanent')
+      default:
+        return allNotes
+    }
+  }
+
+  const displayNotes = searchResults.length > 0
+    ? searchResults
+    : applyTagFilter(notes)
   const isSearching = searchResults.length > 0 || searchLoading
 
   if (!user) return null
@@ -51,6 +93,14 @@ export function VaultBrowser() {
             <span className="vault-count">{totalCount}</span>
           </div>
           <button
+            className="vault-export-btn"
+            onClick={handleExport}
+            disabled={exporting || totalCount === 0}
+            title="Sao lưu toàn bộ Vault ra ZIP"
+          >
+            {exporting ? '⏳ Đang nén...' : '💾 Xuất ZIP'}
+          </button>
+          <button
             className="vault-new-note-btn"
             onClick={handleCreateNote}
             disabled={creatingNote}
@@ -59,6 +109,9 @@ export function VaultBrowser() {
             +
           </button>
         </div>
+
+        {/* Tag Filter Pills */}
+        <VaultTagFilter active={tagFilter} onChange={setTagFilter} />
 
         {/* Search */}
         <SearchBar
