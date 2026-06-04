@@ -169,7 +169,7 @@ export function PaymentFlow({ onClose }: PaymentFlowProps) {
               Mã giao dịch: <strong>{transactionCode}</strong>
             </div>
             <p className="payment-waiting-note">
-              Nếu sau 24h chưa được xác nhận, liên hệ admin: <strong>admin@brain2.thongphan.com</strong>
+              Nếu sau 24h chưa được xác nhận, liên hệ admin: <strong>thong@thongphan.com</strong>
             </p>
             <Button variant="primary" onClick={onClose}>Đóng</Button>
           </div>

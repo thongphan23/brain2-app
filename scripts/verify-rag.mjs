@@ -204,7 +204,7 @@ async function verifyRAG() {
   log('  ⚠️  Full E2E test — requires a real logged-in user session')
   log('')
   log('  TO CONFIRM RAG WORKS END-TO-END:')
-  log('  1. Login to https://brain2-platform.pages.dev')
+  log('  1. Login to https://brain2.conan.school')
   log('  2. Create a note in Vault (e.g. title: "My Learning System")')
   log('  3. Go to Chat → ask: "What is my learning system?"')
   log('  4. If AI references your note → RAG is working ✅')

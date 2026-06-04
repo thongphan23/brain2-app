@@ -46,7 +46,7 @@
 2. Select **Pages** → **Connect to Git**
 3. Connect `thongphan23/brain2-app`
 4. Set:
-   - **Project name:** `brain2`
+   - **Project name:** `brain2-platform`
    - **Build command:** `npm run build`
    - **Build output directory:** `dist`
    - **Root directory:** `/`
@@ -57,11 +57,22 @@ Or: Just push to GitHub — GitHub Actions will auto-deploy via `.github/workflo
 
 ---
 
-## Step 4: DNS Setup (Optional)
+## Step 4: DNS Setup
+
+### Primary domain
+
+- Domain: `brain2.conan.school`
+- Cloudflare Pages project: `brain2-platform`
+- CNAME target: `brain2-platform.pages.dev`
+- DNS record for Conan zone: `brain2` CNAME → `brain2-platform.pages.dev`
+- Cloudflare Pages custom domain status: added, pending DNS validation
+- Verify: `dig brain2.conan.school`
+
+### Legacy domain
 
 - Domain: `brain2.thongphan.com`
-- CNAME → `<pages-subdomain>.pages.dev`
-- Verify: `dig brain2.thongphan.com`
+- Current status: active on `brain2-platform`
+- Keep during migration until traffic and auth callbacks are confirmed on `brain2.conan.school`
 
 ---
 
@@ -69,8 +80,11 @@ Or: Just push to GitHub — GitHub Actions will auto-deploy via `.github/workflo
 
 1. Go to Supabase Dashboard → Authentication → URL Configuration
 2. Set:
-   - **Site URL:** `https://brain2.thongphan.com` (or Cloudflare Pages URL if no custom domain)
-   - **Redirect URLs:** `https://brain2.thongphan.com/auth/callback`
+   - **Site URL:** `https://brain2.conan.school`
+   - **Redirect URLs:**
+     - `https://brain2.conan.school/auth/callback`
+     - `https://brain2.thongphan.com/auth/callback`
+     - `https://brain2-platform.pages.dev/auth/callback`
 3. Google OAuth: Authentication → Providers → Google → Add credentials
 
 ---
@@ -89,7 +103,7 @@ Manual trigger: GitHub → Actions → "Deploy Brain2" → Run workflow
 
 ```
 # Frontend
-open https://brain2.thongphan.com
+open https://brain2.conan.school
 
 # Edge Functions health check
 curl "https://sauuvyffudkmdbeglspb.supabase.co/functions/v1/chat" \
@@ -106,7 +120,7 @@ curl "https://sauuvyffudkmdbeglspb.supabase.co/functions/v1/chat" \
 - Verify env vars set in Supabase → Edge Functions → each function → Settings
 
 ### Supabase Auth not working
-- Verify redirect URL: `https://brain2.thongphan.com/auth/callback`
+- Verify redirect URL: `https://brain2.conan.school/auth/callback`
 
 ### Payment webhook not working
 - Verify `PAYMENT_WEBHOOK_SECRET` matches between GitHub Secrets and Supabase Edge Function env
